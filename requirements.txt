@@ -1,0 +1,12 @@
+python-dotenv
+langchain-community
+langchain-core
+litellm
+requests
+transformers
+torch
+accelerate
+fastapi
+uvicorn
+bitsandbytes
+pydantic-settings 

@@ -1,0 +1,319 @@
+/* app/globals.css */
+/* =============== */
+/* Tailwind CSS 전역 스타일 */
+/* - 기본 스타일, 다크모드, 커스텀 컴포넌트 */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================ */
+/* 기본 스타일 */
+/* ============================================================================ */
+
+@layer base {
+  /* HTML 기본 설정 */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* 다크모드 기본 색상 */
+  :root {
+    --foreground-rgb: 0, 0, 0;
+    --background-start-rgb: 214, 219, 220;
+    --background-end-rgb: 255, 255, 255;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --foreground-rgb: 255, 255, 255;
+      --background-start-rgb: 0, 0, 0;
+      --background-end-rgb: 0, 0, 0;
+    }
+  }
+
+  /* 스크롤바 스타일링 */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100 dark:bg-gray-800;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400 dark:bg-gray-500;
+  }
+
+  /* 선택 영역 스타일 */
+  ::selection {
+    @apply bg-blue-200 dark:bg-blue-800 text-blue-900 dark:text-blue-100;
+  }
+
+  /* 포커스 아웃라인 제거 (접근성을 위해 대체 스타일 제공) */
+  *:focus {
+    outline: none;
+  }
+
+  *:focus-visible {
+    @apply ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900;
+  }
+}
+
+/* ============================================================================ */
+/* 컴포넌트 스타일 */
+/* ============================================================================ */
+
+@layer components {
+  /* 버튼 기본 스타일 */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-gray-600 hover:bg-gray-100 focus:ring-gray-500 dark:text-gray-400 dark:hover:bg-gray-800;
+  }
+
+  /* 입력 필드 기본 스타일 */
+  .input {
+    @apply w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white dark:placeholder-gray-400;
+  }
+
+  .input-error {
+    @apply border-red-300 focus:ring-red-500 dark:border-red-600;
+  }
+
+  /* 카드 스타일 */
+  .card {
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700;
+  }
+
+  .card-header {
+    @apply px-6 py-4 border-b border-gray-200 dark:border-gray-700;
+  }
+
+  .card-body {
+    @apply px-6 py-4;
+  }
+
+  .card-footer {
+    @apply px-6 py-4 border-t border-gray-200 dark:border-gray-700;
+  }
+
+  /* 메시지 버블 스타일 */
+  .message-bubble {
+    @apply max-w-[80%] px-4 py-3 rounded-lg break-words;
+  }
+
+  .message-bubble-user {
+    @apply bg-blue-600 text-white ml-auto;
+  }
+
+  .message-bubble-assistant {
+    @apply bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white;
+  }
+
+  .message-bubble-system {
+    @apply bg-yellow-100 text-yellow-800 border border-yellow-200 mx-auto dark:bg-yellow-900/20 dark:text-yellow-200 dark:border-yellow-800;
+  }
+
+  /* 로딩 애니메이션 */
+  .loading-dots {
+    @apply flex space-x-1;
+  }
+
+  .loading-dot {
+    @apply w-2 h-2 bg-current rounded-full animate-bounce;
+  }
+
+  .loading-dot:nth-child(2) {
+    animation-delay: 0.1s;
+  }
+
+  .loading-dot:nth-child(3) {
+    animation-delay: 0.2s;
+  }
+
+  /* 스피너 애니메이션 */
+  .spinner {
+    @apply animate-spin rounded-full border-2 border-current border-t-transparent;
+  }
+}
+
+/* ============================================================================ */
+/* 유틸리티 스타일 */
+/* ============================================================================ */
+
+@layer utilities {
+  /* 텍스트 그라데이션 */
+  .text-gradient {
+    @apply bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent;
+  }
+
+  /* 글래스모피즘 효과 */
+  .glass {
+    @apply bg-white/10 backdrop-blur-md border border-white/20;
+  }
+
+  /* 그림자 효과 */
+  .shadow-glow {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+
+  /* 애니메이션 */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+
+  /* 반응형 숨김/표시 */
+  .mobile-only {
+    @apply block sm:hidden;
+  }
+
+  .desktop-only {
+    @apply hidden sm:block;
+  }
+
+  /* 스크롤 영역 */
+  .scroll-area {
+    @apply overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800;
+  }
+}
+
+/* ============================================================================ */
+/* 키프레임 애니메이션 */
+/* ============================================================================ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ============================================================================ */
+/* 다크모드 특별 처리 */
+/* ============================================================================ */
+
+@media (prefers-color-scheme: dark) {
+  /* 다크모드에서 이미지 밝기 조절 */
+  img:not([data-no-dark]) {
+    filter: brightness(0.9);
+  }
+
+  /* 다크모드에서 비디오 밝기 조절 */
+  video:not([data-no-dark]) {
+    filter: brightness(0.9);
+  }
+}
+
+/* ============================================================================ */
+/* 접근성 개선 */
+/* ============================================================================ */
+
+/* 모션 감소 설정 사용자를 위한 애니메이션 비활성화 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 고대비 모드 지원 */
+@media (prefers-contrast: high) {
+  .btn {
+    @apply border-2 border-current;
+  }
+
+  .card {
+    @apply border-2;
+  }
+}
+
+/* ============================================================================ */
+/* 프린트 스타일 */
+/* ============================================================================ */
+
+@media print {
+  /* 프린트 시 불필요한 요소 숨김 */
+  .no-print {
+    display: none !important;
+  }
+
+  /* 프린트 시 배경색 제거 */
+  * {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* 프린트 시 그림자 제거 */
+  .shadow,
+  .shadow-sm,
+  .shadow-md,
+  .shadow-lg,
+  .shadow-xl {
+    box-shadow: none !important;
+  }
+} 
