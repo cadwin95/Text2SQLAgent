@@ -145,6 +145,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     // 간단한 메시지 누적
     let currentContent = '';
     let isStreamingMessageAdded = false;
+    let accumulatedChartData: any = null;
+    let accumulatedTableData: any = null;
 
     try {
       // 스트리밍 API 호출
@@ -175,11 +177,24 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
           currentContent += `⚙️ **✅ 단계 ${update.step_number}: ${update.description}**\n\n`;
           if (update.chart_data) {
             currentContent += `📊 **차트가 생성되었습니다:**\n\n`;
+            accumulatedChartData = update.chart_data; // 차트 데이터 누적
+          }
+          if (update.table_data) {
+            currentContent += `📋 **테이블이 생성되었습니다:**\n\n`;
+            accumulatedTableData = update.table_data; // 테이블 데이터 누적
           }
         } else if (update.type === 'result') {
           currentContent += `📈 **${update.message}**\n`;
         } else if (update.type === 'error') {
           currentContent += `❌ **오류 발생**\n${update.message}\n\n`;
+        }
+
+        // 데이터 누적 (다른 업데이트 타입에서도 차트/테이블 데이터가 올 수 있음)
+        if (update.chart_data && !accumulatedChartData) {
+          accumulatedChartData = update.chart_data;
+        }
+        if (update.table_data && !accumulatedTableData) {
+          accumulatedTableData = update.table_data;
         }
 
         // 첫 번째 업데이트에서만 메시지 추가, 이후는 업데이트만
@@ -191,8 +206,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
             timestamp: new Date(),
             metadata: {
               isStreaming: update.type !== 'done' && update.type !== 'result',
-              chartData: update.chart_data || undefined,
-              tableData: update.table_data || undefined
+              chartData: accumulatedChartData,
+              tableData: accumulatedTableData
             }
           };
           addMessage(activeSessionId, streamingMessage);
@@ -203,8 +218,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
             content: currentContent,
             metadata: {
               isStreaming: update.type !== 'done' && update.type !== 'result',
-              chartData: update.chart_data || undefined,
-              tableData: update.table_data || undefined
+              chartData: accumulatedChartData,
+              tableData: accumulatedTableData
             }
           });
         }

@@ -11,6 +11,8 @@
 import React, { useState } from 'react';
 import { MessageBubbleProps } from '@/types';
 import ChartDisplay from '../chart/ChartDisplay';
+import QueryResultTable from '../QueryResultTable';
+import QueryResultChart from '../QueryResultChart';
 
 /**
  * MessageBubble 컴포넌트
@@ -234,11 +236,40 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         chartData = message.metadata.chartData;
       }
       
+      // 디버깅용 로깅
+      console.log('🔍 MessageBubble parseMessageData 실행:', {
+        messageId: message.id,
+        messageRole: message.role,
+        hasMetadata: !!message.metadata,
+        metadataChartData: message.metadata?.chartData,
+        tableData,
+        chartData
+      });
+      
+      if (chartData) {
+        console.log('📊 차트 데이터 발견!', {
+          messageId: message.id,
+          chartData,
+          chartType: chartData.type,
+          chartTitle: chartData.title,
+          labelsCount: chartData.data?.labels?.length,
+          datasetsCount: chartData.data?.datasets?.length
+        });
+      }
+      
       return { tableData, chartData };
     };
 
     const { tableData, chartData } = parseMessageData();
     const hasVisualData = tableData || chartData;
+    
+    console.log('🎨 렌더링 상태 확인:', {
+      messageId: message.id,
+      hasVisualData,
+      tableData: !!tableData,
+      chartData: !!chartData,
+      chartDataType: chartData?.type
+    });
 
     // 일반 텍스트 메시지 및 시각화 데이터
     return (
@@ -251,18 +282,22 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           <div className={`mt-4 ${tableData && chartData ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : ''}`}>
             {tableData && (
               <div className="order-1">
-                {renderDataTable(tableData)}
+                <QueryResultTable
+                  data={tableData}
+                  title="쿼리 결과"
+                  showQuery={true}
+                  className="w-full"
+                />
               </div>
             )}
             {chartData && (
               <div className="order-2">
-                <ChartDisplay
-                  type={chartData.type}
-                  data={chartData.data}
-                  {...(chartData.title && { title: chartData.title })}
-                  options={chartData.options}
+                <QueryResultChart
+                  data={chartData}
+                  title={chartData.title || "데이터 시각화"}
                   width={500}
                   height={300}
+                  className="w-full"
                 />
               </div>
             )}

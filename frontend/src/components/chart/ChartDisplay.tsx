@@ -64,7 +64,17 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
   height = 400,
   options = {}
 }) => {
-  console.log('ChartDisplay 렌더링:', { type, data, title });
+  console.log('🎬 ChartDisplay 렌더링:', { 
+    type, 
+    data, 
+    title,
+    hasData: !!data,
+    hasLabels: !!data?.labels,
+    hasDatasets: !!data?.datasets,
+    labelsLength: data?.labels?.length,
+    datasetsLength: data?.datasets?.length,
+    firstDatasetData: data?.datasets?.[0]?.data
+  });
 
   // 기본 차트 옵션
   const defaultOptions = {

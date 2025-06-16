@@ -168,7 +168,9 @@ SQL 쿼리:"""
 
         try:
             from llm_client import get_llm_client
-            llm_client = get_llm_client()
+            import os
+            backend = os.getenv('LLM_BACKEND', 'openai')
+            llm_client = get_llm_client(backend)
             
             response = llm_client.chat([
                 {"role": "system", "content": "당신은 SQL 전문가입니다. 주어진 스키마에 맞는 정확한 SQL 쿼리만 생성하세요."},
