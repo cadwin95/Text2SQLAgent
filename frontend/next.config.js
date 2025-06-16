@@ -11,9 +11,6 @@ const nextConfig = {
     // 향후 실험적 기능 추가 예정
   },
 
-  // 서버 외부 패키지 (Next.js 15에서 이동됨)
-  serverExternalPackages: ['socket.io-client'],
-
   // TypeScript 설정
   typescript: {
     // 빌드 시 타입 체크 무시 (CI/CD에서 별도 체크)

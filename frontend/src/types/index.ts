@@ -42,6 +42,12 @@ export interface Message {
       };
       options?: any;
     };
+    tableData?: {
+      columns: string[];
+      rows: any[];
+      total_rows?: number;
+      query_code?: string;
+    };
   };
 }
 

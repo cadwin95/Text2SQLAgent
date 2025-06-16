@@ -8,10 +8,32 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { Chart, ChartConfiguration, registerables } from 'chart.js';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+} from 'chart.js';
+import { Chart } from 'react-chartjs-2';
 
-// Chart.js 모든 컴포넌트 등록
-Chart.register(...registerables);
+// Chart.js 컴포넌트 등록
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+);
 
 interface ChartData {
   labels: string[];
@@ -42,85 +64,55 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
   height = 400,
   options = {}
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const chartRef = useRef<Chart | null>(null);
+  console.log('ChartDisplay 렌더링:', { type, data, title });
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
-    // 기존 차트 제거
-    if (chartRef.current) {
-      chartRef.current.destroy();
-    }
-
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-
-    // 기본 차트 옵션
-    const defaultOptions = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
+  // 기본 차트 옵션
+  const defaultOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      title: {
+        display: !!title,
+        text: title,
+        font: {
+          size: 16,
+          weight: 'bold' as const,
+        },
+      },
+      legend: {
+        display: true,
+        position: 'bottom' as const,
+      },
+    },
+    scales: type === 'line' || type === 'bar' ? {
+      x: {
+        display: true,
         title: {
-          display: !!title,
-          text: title,
-          font: {
-            size: 16,
-            weight: 'bold',
-          },
-        },
-        legend: {
           display: true,
-          position: 'bottom' as const,
+          text: '연도',
         },
       },
-      scales: type === 'line' || type === 'bar' ? {
-        x: {
+      y: {
+        display: true,
+        title: {
           display: true,
-          title: {
-            display: true,
-            text: '연도',
-          },
+          text: '값',
         },
-        y: {
-          display: true,
-          title: {
-            display: true,
-            text: '값',
-          },
-          beginAtZero: true,
-        },
-      } : {},
-    };
-
-    // 차트 설정
-    const config: ChartConfiguration = {
-      type: type,
-      data: data,
-      options: {
-        ...defaultOptions,
-        ...options,
+        beginAtZero: true,
       },
-    };
-
-    // 차트 생성
-    chartRef.current = new Chart(ctx, config);
-
-    return () => {
-      if (chartRef.current) {
-        chartRef.current.destroy();
-      }
-    };
-  }, [type, data, title, options]);
+    } : {},
+    ...options,
+  };
 
   return (
     <div className="chart-container bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-      <canvas
-        ref={canvasRef}
-        width={width}
-        height={height}
-        className="max-w-full h-auto"
-      />
+      <div style={{ width: `${width}px`, height: `${height}px`, maxWidth: '100%' }}>
+        <Chart
+          type={type}
+          data={data}
+          options={defaultOptions}
+        />
+      </div>
     </div>
   );
 };

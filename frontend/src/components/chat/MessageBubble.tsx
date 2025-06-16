@@ -73,6 +73,78 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   // ============================================================================
 
   /**
+   * 데이터 테이블 렌더링
+   */
+  const renderDataTable = (tableData: any) => {
+    if (!tableData || !tableData.columns || !tableData.rows) return null;
+
+    const { columns, rows, total_rows, query_code } = tableData;
+    
+    return (
+      <div className="mt-4 border rounded-lg overflow-hidden bg-white dark:bg-gray-800">
+        {/* 쿼리 코드 표시 */}
+        {query_code && (
+          <div className="bg-gray-50 dark:bg-gray-700 px-3 py-2 border-b">
+            <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">실행된 쿼리:</div>
+            <code className="text-sm font-mono text-blue-600 dark:text-blue-400">
+              {query_code}
+            </code>
+          </div>
+        )}
+        
+        {/* 테이블 헤더 */}
+        <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 border-b">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              데이터 결과
+            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {rows.length}개 행 표시 {total_rows > rows.length && `(총 ${total_rows}개)`}
+            </span>
+          </div>
+        </div>
+        
+        {/* 테이블 본문 */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 dark:bg-gray-700">
+              <tr>
+                {columns.map((column: string, index: number) => (
+                  <th 
+                    key={index}
+                    className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300 border-b"
+                  >
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row: any, rowIndex: number) => (
+                <tr 
+                  key={rowIndex}
+                  className={rowIndex % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-750'}
+                >
+                  {columns.map((column: string, colIndex: number) => (
+                    <td 
+                      key={colIndex}
+                      className="px-3 py-2 text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600"
+                    >
+                      {typeof row[column] === 'number' ? 
+                        row[column].toLocaleString() : 
+                        String(row[column] || '')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  /**
    * 차트 렌더링
    */
   const renderChart = () => {
@@ -134,13 +206,71 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       );
     }
 
-    // 일반 텍스트 메시지 및 차트
+    // 메시지 내용 파싱하여 table_data와 chart_data 추출
+    const parseMessageData = () => {
+      let tableData = null;
+      let chartData = null;
+      
+      // 스트리밍 메시지에서 JSON 데이터 추출 시도
+      try {
+        const tableMatch = message.content.match(/\[TABLE_DATA\]([\s\S]*?)\[\/TABLE_DATA\]/);
+        const chartMatch = message.content.match(/\[CHART_DATA\]([\s\S]*?)\[\/CHART_DATA\]/);
+        
+        if (tableMatch) {
+          tableData = JSON.parse(tableMatch[1]);
+        }
+        if (chartMatch) {
+          chartData = JSON.parse(chartMatch[1]);
+        }
+      } catch (e) {
+        // JSON 파싱 실패 시 무시
+      }
+      
+      // metadata에서도 확인
+      if (!tableData && (message.metadata as any)?.tableData) {
+        tableData = (message.metadata as any).tableData;
+      }
+      if (!chartData && message.metadata?.chartData) {
+        chartData = message.metadata.chartData;
+      }
+      
+      return { tableData, chartData };
+    };
+
+    const { tableData, chartData } = parseMessageData();
+    const hasVisualData = tableData || chartData;
+
+    // 일반 텍스트 메시지 및 시각화 데이터
     return (
       <div>
         <div className="whitespace-pre-wrap">
-          {message.content}
+          {message.content.replace(/\[TABLE_DATA\][\s\S]*?\[\/TABLE_DATA\]/, '').replace(/\[CHART_DATA\][\s\S]*?\[\/CHART_DATA\]/, '')}
         </div>
-        {renderChart()}
+        
+        {hasVisualData && (
+          <div className={`mt-4 ${tableData && chartData ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : ''}`}>
+            {tableData && (
+              <div className="order-1">
+                {renderDataTable(tableData)}
+              </div>
+            )}
+            {chartData && (
+              <div className="order-2">
+                <ChartDisplay
+                  type={chartData.type}
+                  data={chartData.data}
+                  {...(chartData.title && { title: chartData.title })}
+                  options={chartData.options}
+                  width={500}
+                  height={300}
+                />
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* 기존 차트 렌더링 (백워드 호환성) */}
+        {!hasVisualData && renderChart()}
       </div>
     );
   };
@@ -187,12 +317,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     return (
       <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
         <div className="flex flex-wrap gap-2 text-xs opacity-70">
-          {isStreaming && (
-            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded flex items-center space-x-1">
-              <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
-              <span>실시간 분석 중...</span>
-            </span>
-          )}
+
           {queryType && (
             <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
               {queryType}

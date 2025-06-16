@@ -1,0 +1,22 @@
+[project]
+name = "publicdatatext2sqlagent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "accelerate>=1.7.0",
+    "bitsandbytes>=0.46.0",
+    "fastapi>=0.115.12",
+    "langchain>=0.3.25",
+    "litellm>=1.72.6",
+    "mcp>=1.9.4",
+    "numpy>=2.3.0",
+    "openai>=1.86.0",
+    "pandas>=2.3.0",
+    "pydantic>=2.11.7",
+    "requests>=2.32.4",
+    "torch>=2.7.1",
+    "transformers>=4.52.4",
+    "uvicorn>=0.34.3",
+]

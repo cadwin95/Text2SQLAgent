@@ -141,8 +141,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
 
     // 스트리밍 응답을 위한 임시 메시지 ID
     const streamingMessageId = `streaming-${Date.now()}`;
-    let streamingContent = '';
-    let toolStatus: any[] = [];
+    
+    // 간단한 메시지 누적
+    let currentContent = '';
+    let isStreamingMessageAdded = false;
 
     try {
       // 스트리밍 API 호출
@@ -155,131 +157,57 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       }, (update) => {
         console.log('스트리밍 업데이트:', update);
 
-        switch (update.type) {
-          case 'start':
-            streamingContent = '🚀 ' + update.message + '\n\n';
-            break;
-
-          case 'planning':
-            if (update.status === 'running') {
-              streamingContent += `📋 **계획 수립**\n${update.message}\n`;
-            } else if (update.status === 'completed') {
-              streamingContent += `${update.message}\n`;
-              if (update.data?.steps) {
-                streamingContent += update.data.steps.map((step: string, index: number) => 
-                  `${index + 1}. ${step}`
-                ).join('\n') + '\n\n';
-              }
-            }
-            break;
-
-          case 'tool_call':
-            if (update.status === 'running') {
-              streamingContent += `⚙️ **🔄 단계 ${update.step_number}: ${update.description}**\n`;
-              streamingContent += `${update.message}\n상태: 🔄 실행 중...\n`;
-            } else if (update.status === 'completed') {
-              // 실행 중 메시지를 완료 메시지로 교체
-              const runningPattern = new RegExp(`⚙️ \\*\\*🔄 단계 ${update.step_number}:.*?\\n.*?상태: 🔄 실행 중\\.\\.\\.\\n`, 's');
-              streamingContent = streamingContent.replace(runningPattern, '');
-              streamingContent += `${update.message}\n\n`;
-            } else if (update.status === 'error') {
-              streamingContent += `${update.message}\n\n`;
-            }
-            break;
-
-          case 'query':
-            if (update.status === 'running') {
-              streamingContent += `⚙️ **🔄 단계 ${update.step_number}: ${update.description}**\n`;
-              streamingContent += `${update.message}\n`;
-            } else if (update.status === 'completed') {
-              const runningPattern = new RegExp(`⚙️ \\*\\*🔄 단계 ${update.step_number}:.*?\\n.*?📊 데이터 쿼리 실행 중\\.\\.\\.\\n`, 's');
-              streamingContent = streamingContent.replace(runningPattern, '');
-              streamingContent += `${update.message}\n\n`;
-            }
-            break;
-
-          case 'visualization':
-            if (update.chart_data) {
-              streamingContent += `⚙️ **✅ 단계 ${update.step_number}: ${update.description}**\n\n`;
-              streamingContent += `📊 **차트가 생성되었습니다:**\n\n`;
-              
-              // 차트 데이터를 메타데이터에 저장
-              const existingMessage = messages.find(m => m.id === streamingMessageId);
-              const streamingMessage: Message = {
-                id: streamingMessageId,
-                content: streamingContent,
-                role: 'assistant',
-                timestamp: new Date(),
-                metadata: {
-                  isStreaming: update.type !== 'done' && update.type !== 'result',
-                  toolStatus: toolStatus,
-                  chartData: update.chart_data
-                }
-              };
-
-              if (existingMessage) {
-                // 기존 메시지 업데이트
-                updateMessage(activeSessionId, streamingMessageId, {
-                  content: streamingContent,
-                  metadata: {
-                    isStreaming: update.type !== 'done' && update.type !== 'result',
-                    toolStatus: toolStatus,
-                    chartData: update.chart_data
-                  }
-                });
-              } else {
-                addMessage(activeSessionId, streamingMessage);
-              }
-            } else {
-              streamingContent += `⚙️ **✅ 단계 ${update.step_number}: ${update.description}**\n\n`;
-            }
-            break;
-
-          case 'result':
-            if (update.status === 'completed') {
-              streamingContent = update.message; // 최종 결과로 완전 교체
-            } else {
-              streamingContent += `📈 **${update.message}**\n\n`;
-            }
-            break;
-
-          case 'error':
-            streamingContent += `❌ **오류 발생**\n${update.message}\n\n`;
-            break;
-
-          case 'done':
-            // 완료 처리는 별도로 수행
-            break;
+        // 완료된 단계만 추가 (중복 방지)
+        if (update.type === 'start') {
+          currentContent = `🚀 ${update.message}\n\n`;
+        } else if (update.type === 'planning' && update.status === 'completed') {
+          currentContent += `✅ 계획 수립 완료: ${update.data?.steps?.length || 0}개 단계\n`;
+          if (update.data?.steps) {
+            currentContent += update.data.steps.map((step: string, index: number) => 
+              `${index + 1}. ${step}`
+            ).join('\n') + '\n\n';
+          }
+        } else if (update.type === 'tool_call' && update.status === 'completed') {
+          currentContent += `✅ 도구 실행 완료: ${update.tool_name || 'Unknown'}\n\n`;
+        } else if (update.type === 'query' && update.status === 'completed') {
+          currentContent += `✅ 쿼리 실행 완료\n\n`;
+        } else if (update.type === 'visualization') {
+          currentContent += `⚙️ **✅ 단계 ${update.step_number}: ${update.description}**\n\n`;
+          if (update.chart_data) {
+            currentContent += `📊 **차트가 생성되었습니다:**\n\n`;
+          }
+        } else if (update.type === 'result') {
+          currentContent += `📈 **${update.message}**\n`;
+        } else if (update.type === 'error') {
+          currentContent += `❌ **오류 발생**\n${update.message}\n\n`;
         }
 
-                 // 스트리밍 메시지 업데이트
-         setCurrentStreamingMessage(streamingContent);
-
-         // 기존 스트리밍 메시지가 있으면 업데이트, 없으면 새로 추가
-         const existingMessage = messages.find(m => m.id === streamingMessageId);
-         const streamingMessage: Message = {
-           id: streamingMessageId,
-           content: streamingContent,
-           role: 'assistant',
-           timestamp: new Date(),
-           metadata: {
-             isStreaming: update.type !== 'done' && update.type !== 'result',
-             toolStatus: toolStatus,
-           }
-         };
-
-         if (existingMessage) {
-           // 기존 메시지 업데이트
-           updateMessage(activeSessionId, streamingMessageId, {
-             content: streamingContent,
-             metadata: {
-               isStreaming: update.type !== 'done' && update.type !== 'result',
-               toolStatus: toolStatus,
-             }
-           });
-         } else {
-           addMessage(activeSessionId, streamingMessage);
-         }
+        // 첫 번째 업데이트에서만 메시지 추가, 이후는 업데이트만
+        if (!isStreamingMessageAdded) {
+          const streamingMessage: Message = {
+            id: streamingMessageId,
+            content: currentContent,
+            role: 'assistant',
+            timestamp: new Date(),
+            metadata: {
+              isStreaming: update.type !== 'done' && update.type !== 'result',
+              chartData: update.chart_data || undefined,
+              tableData: update.table_data || undefined
+            }
+          };
+          addMessage(activeSessionId, streamingMessage);
+          isStreamingMessageAdded = true;
+        } else {
+          // 기존 메시지 업데이트
+          updateMessage(activeSessionId, streamingMessageId, {
+            content: currentContent,
+            metadata: {
+              isStreaming: update.type !== 'done' && update.type !== 'result',
+              chartData: update.chart_data || undefined,
+              tableData: update.table_data || undefined
+            }
+          });
+        }
       });
 
       setIsLoading(false);
