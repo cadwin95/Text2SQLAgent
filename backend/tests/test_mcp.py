@@ -42,7 +42,7 @@ class TestKOSISAPIReal:
     
     def test_fetch_kosis_data_sample(self):
         """
-        KOSIS data query test (sample data)
+        KOSIS 데이터 조회 테스트
         """
         # Use official sample userStatsId
         result = fetch_kosis_data(
@@ -227,15 +227,15 @@ class TestKOSISAPIEdgeCases:
         empty_df = pd.DataFrame()
         assert isinstance(empty_df, pd.DataFrame)
         
-        # Sample data format test
-        sample_data = [
+        # 기본 데이터 포맷 테스트
+        test_data = [
             {
                 "TBL_NM": "Test Table",
                 "PRD_DE": "2023",
                 "DT": "12345"
             }
         ]
-        df = pd.DataFrame(sample_data)
+        df = pd.DataFrame(test_data)
         assert len(df) == 1
         assert "TBL_NM" in df.columns
         assert "PRD_DE" in df.columns
@@ -264,13 +264,13 @@ def test_pandas_integration():
     """
     pandas DataFrame integration test
     """
-    # Check if basic DataFrame creation/manipulation works correctly
-    sample_data = {
+    # DataFrame 생성/조작이 올바르게 작동하는지 확인
+    test_data = {
         'TBL_NM': ['Population Statistics', 'Economic Statistics'],
         'ORG_NM': ['Statistics Korea', 'Bank of Korea'],
         'PRD_DE': ['2023', '2023']
     }
-    df = pd.DataFrame(sample_data)
+    df = pd.DataFrame(test_data)
     
     assert len(df) == 2
     assert list(df.columns) == ['TBL_NM', 'ORG_NM', 'PRD_DE']

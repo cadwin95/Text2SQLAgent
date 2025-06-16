@@ -21,9 +21,9 @@ class OpenAIClient(LLMClient):
 
     def chat(self, messages, **kwargs):
         response = self.client.chat.completions.create(
-            model=kwargs.get("model", "gpt-3.5-turbo"),
+            model=kwargs.get("model", "gpt-4.1-mini"),
             messages=messages,
-            max_tokens=kwargs.get("max_tokens", 256),
+            max_tokens=kwargs.get("max_tokens", 4096),
             temperature=kwargs.get("temperature", 0.1),
         )
         return response.choices[0].message.content

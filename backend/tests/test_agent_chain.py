@@ -97,10 +97,10 @@ def test_agent_chain_dataframe_management():
     assert isinstance(chain.df_agent.dataframes, dict)
     initial_df_count = len(chain.df_agent.dataframes)
     
-    # DataFrame 추가 후 개수 확인 (실제 tool 호출 시뮬레이션)
+    # DataFrame 추가 후 개수 확인 (tool 호출 시뮬레이션)
     import pandas as pd
-    sample_df = pd.DataFrame({'year': [2020, 2021], 'population': [50000000, 51000000]})
-    chain.df_agent.dataframes['test_data'] = sample_df
+    test_df = pd.DataFrame({'year': [2020, 2021], 'population': [50000000, 51000000]})
+    chain.df_agent.dataframes['test_data'] = test_df
     
     assert len(chain.df_agent.dataframes) == initial_df_count + 1
     assert 'test_data' in chain.df_agent.dataframes 

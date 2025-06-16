@@ -16,13 +16,13 @@ def test_text2df_query_agent_success():
     """
     agent = Text2DFQueryAgent(backend="openai")
     
-    # 샘플 DataFrame 추가
-    sample_data = pd.DataFrame({
+    # 테스트용 DataFrame 추가
+    test_data = pd.DataFrame({
         'year': [2020, 2021, 2022, 2023],
         'population': [51780000, 51830000, 51880000, 51930000],
         'gdp_growth': [2.1, 3.2, 2.8, 3.5]
     })
-    agent.dataframes['population_data'] = sample_data
+    agent.dataframes['test_data'] = test_data
     
     question = "인구 데이터의 평균 GDP 성장률을 계산해주세요"
     result = agent.run(question)
@@ -79,12 +79,12 @@ def test_get_dataframe_info():
     assert "사용 가능한 DataFrame이 없습니다." in info
     
     # DataFrame 추가 후 테스트
-    sample_data = pd.DataFrame({
+    test_data = pd.DataFrame({
         'year': [2020, 2021, 2022],
         'value': [100.5, 200.7, 300.2],
         'category': ['A', 'B', 'C']
     })
-    agent.dataframes['test_data'] = sample_data
+    agent.dataframes['test_data'] = test_data
     
     info = agent._get_dataframe_info()
     
@@ -98,7 +98,7 @@ def test_get_dataframe_info():
     assert "float" in info  # value 컬럼
     assert "object" in info  # category 컬럼
     
-    # 샘플 데이터 확인
+    # 기본 정보 확인
     assert "2020" in info and "100.5" in info and "A" in info
     
     # 통계 정보 확인 (숫자형 컬럼)

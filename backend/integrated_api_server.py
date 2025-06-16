@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, AsyncGenerator
 import time
+import numpy as np
 
 # 로컬 모듈 import (시스템 경로 추가)
 import sys
@@ -281,20 +282,26 @@ def generate_chart_data(dataframes: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
     try:
         # 사용 가능한 DataFrame이 있는지 확인
         if not dataframes:
+            print("[차트 생성] DataFrame이 없습니다")
             return None
         
         # 첫 번째 DataFrame 사용 (일반적으로 fetch_kosis_data로 생성된 것)
         df_name = next(iter(dataframes.keys()))
         df = dataframes[df_name]
         
+        print(f"[차트 생성] DataFrame: {df_name}, 컬럼: {df.columns.tolist()}, 행 수: {len(df)}")
+        
         if df.empty:
+            print("[차트 생성] DataFrame이 비어있습니다")
             return None
         
         # 인구 데이터인 경우 (PRD_DE, DT 컬럼이 있는 경우)
         if 'PRD_DE' in df.columns and 'DT' in df.columns:
             # 연도별 데이터 추출
             years = df['PRD_DE'].astype(str).tolist()
-            values = pd.to_numeric(df['DT'], errors='coerce').tolist()
+            values = pd.to_numeric(df['DT'], errors='coerce').fillna(0).tolist()
+            
+            print(f"[차트 생성] 연도: {years}, 값: {values}")
             
             # 성장률 계산
             growth_rates = []
@@ -308,14 +315,14 @@ def generate_chart_data(dataframes: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
             # 첫 번째 연도는 성장률이 없으므로 0으로 설정
             growth_rates.insert(0, 0)
             
-            return {
+            chart_data = {
                 'type': 'line',
-                'title': '최근 5년간 인구 성장률 추이 (GDP 성장률 대체)',
+                'title': '최근 연도별 데이터 성장률 추이',
                 'data': {
                     'labels': years,
                     'datasets': [
                         {
-                            'label': '인구 성장률 (%)',
+                            'label': '성장률 (%)',
                             'data': growth_rates,
                             'borderColor': 'rgb(75, 192, 192)',
                             'backgroundColor': 'rgba(75, 192, 192, 0.2)',
@@ -342,11 +349,44 @@ def generate_chart_data(dataframes: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
                     }
                 }
             }
+            
+            print(f"[차트 생성 성공] 데이터: {chart_data}")
+            return chart_data
         
+        # 다른 데이터 타입들도 지원
+        # 숫자 컬럼이 2개 이상 있는 경우 - 바 차트
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+        if len(numeric_columns) >= 2:
+            labels = df.iloc[:, 0].astype(str).tolist()  # 첫 번째 컬럼을 레이블로
+            values = df.iloc[:, 1].tolist()  # 두 번째 컬럼을 값으로
+            
+            chart_data = {
+                'type': 'bar',
+                'title': f'{df.columns[1]} 데이터',
+                'data': {
+                    'labels': labels,
+                    'datasets': [
+                        {
+                            'label': df.columns[1],
+                            'data': values,
+                            'backgroundColor': 'rgba(54, 162, 235, 0.6)',
+                            'borderColor': 'rgba(54, 162, 235, 1)',
+                            'borderWidth': 1
+                        }
+                    ]
+                }
+            }
+            
+            print(f"[차트 생성 성공] 바 차트: {chart_data}")
+            return chart_data
+        
+        print("[차트 생성] 적합한 데이터 구조를 찾을 수 없습니다")
         return None
         
     except Exception as e:
         print(f"차트 데이터 생성 오류: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 @app.post("/v1/chat/stream")
@@ -469,33 +509,117 @@ async def run_agent_chain_streaming(question: str) -> AsyncGenerator[Dict[str, A
                         }
                 
                 elif step_type == 'query':
-                    # DataFrame 쿼리 실행
+                    # SQL 기반 DataFrame 쿼리 실행
                     yield {
                         'type': 'query',
                         'step_number': i,
-                        'message': f'📊 **데이터 쿼리**\n📊 데이터 쿼리 실행 중...',
+                        'message': f'📊 **데이터 쿼리**\n🔄 질문을 SQL 쿼리로 변환 중...',
                         'description': description,
                         'status': 'running'
                     }
                     
-                    result = await asyncio.get_event_loop().run_in_executor(
-                        None, agent_chain.execute_step, step
-                    )
+                    try:
+                        # SQL 기반 처리를 위한 Text2DFQueryAgent 사용
+                        from agent.text2sql_agent import Text2DFQueryAgent
+                        sql_agent = Text2DFQueryAgent()
+                        
+                        # 기존 DataFrame들을 SQL 테이블로 등록
+                        registered_tables = []
+                        for df_name, df in agent_chain.df_agent.dataframes.items():
+                            table_name = sql_agent.register_dataframe(df_name, df)
+                            if table_name:
+                                registered_tables.append(table_name)
+                        
+                        if registered_tables:
+                            yield {
+                                'type': 'query',
+                                'step_number': i,
+                                'message': f'🗃️ SQL 테이블 등록 완료: {", ".join(registered_tables)}',
+                                'status': 'running'
+                            }
+                            
+                            # SQL 쿼리 생성 및 실행
+                            sql_result = sql_agent.run(question)
+                            
+                            if sql_result.get("error"):
+                                yield {
+                                    'type': 'query',
+                                    'step_number': i,
+                                    'message': f'❌ SQL 쿼리 실행 실패: {sql_result["error"]}',
+                                    'status': 'error'
+                                }
+                            else:
+                                sql_query = sql_result.get("sql_query")
+                                sql_data = sql_result.get("result")
+                                
+                                # SQL 쿼리 표시
+                                if sql_query:
+                                    yield {
+                                        'type': 'query',
+                                        'step_number': i,
+                                        'message': f'🔍 **생성된 SQL 쿼리:**\n```sql\n{sql_query}\n```',
+                                        'status': 'running'
+                                    }
+                                
+                                # 결과 데이터 처리
+                                table_data = None
+                                if sql_data and sql_data.get("rows"):
+                                    table_data = {
+                                        'columns': sql_data.get("columns", []),
+                                        'rows': sql_data.get("rows", [])[:10],  # 최대 10행만 표시
+                                        'total_rows': len(sql_data.get("rows", [])),
+                                        'sql_query': sql_query
+                                    }
+                                
+                                yield {
+                                    'type': 'query',
+                                    'step_number': i,
+                                    'message': f'✅ SQL 쿼리 실행 완료 - {len(sql_data.get("rows", []))}행 결과',
+                                    'status': 'completed',
+                                    'data': sql_result,
+                                    'table_data': table_data
+                                }
+                        else:
+                            # Fallback: 기존 pandas 방식
+                            result = await asyncio.get_event_loop().run_in_executor(
+                                None, agent_chain.execute_step, step
+                            )
+                            
+                            if result.get('error'):
+                                yield {
+                                    'type': 'query',
+                                    'step_number': i,
+                                    'message': f'❌ 쿼리 실행 실패: {result["error"]}',
+                                    'status': 'error'
+                                }
+                            else:
+                                # 쿼리 결과에서 테이블 데이터 추출
+                                query_result = result.get('result', {})
+                                table_data = None
+                                
+                                if isinstance(query_result, dict) and 'columns' in query_result and 'rows' in query_result:
+                                    table_data = {
+                                        'columns': query_result['columns'],
+                                        'rows': query_result['rows'][:10],  # 최대 10행만 표시
+                                        'total_rows': len(query_result['rows']),
+                                        'query_code': query_result.get('query_code', '')
+                                    }
+                                
+                                yield {
+                                    'type': 'query',
+                                    'step_number': i,
+                                    'message': f'✅ 쿼리 실행 완료 (pandas)',
+                                    'status': 'completed',
+                                    'data': result,
+                                    'table_data': table_data
+                                }
                     
-                    if result.get('error'):
+                    except Exception as e:
                         yield {
                             'type': 'query',
                             'step_number': i,
-                            'message': f'❌ 쿼리 실행 실패: {result["error"]}',
+                            'message': f'❌ 쿼리 처리 중 오류: {str(e)}',
                             'status': 'error'
-                        }
-                    else:
-                        yield {
-                            'type': 'query',
-                            'step_number': i,
-                            'message': f'✅ 쿼리 실행 완료',
-                            'status': 'completed',
-                            'data': result
                         }
                 
                 elif step_type == 'visualization':
@@ -535,40 +659,20 @@ async def run_agent_chain_streaming(question: str) -> AsyncGenerator[Dict[str, A
                     'status': 'error'
                 }
         
-        # 3단계: 최종 결과 생성
-        yield {
-            'type': 'result',
-            'message': '📈 최종 결과를 생성 중입니다...',
-            'status': 'running'
-        }
-        
-        # 실행된 단계들의 결과를 요약
-        executed_steps = []
-        for i, step in enumerate(steps, 1):
-            step_desc = step.get('description', f'단계 {i}')
-            executed_steps.append(f"{i}. {step_desc} ✅")
-        
-        # 최종 분석 결과 생성 (이미 실행된 단계들 기반)
-        summary_message = f"""
-🔄 **실행된 분석 단계:**
-{chr(10).join(executed_steps)}
-
-📈 **분석 결과:**
-{step.get('type', '').replace('_', ' ').title()} 단계 완료
-"""
-        
-        # 시각화 단계가 있었다면 더미 실행
-        if any('visualization' in step.get('type', '') for step in steps):
-            summary_message += "\n시각화(line_chart) 단계 dummy 실행"
+        # 3단계: 최종 결과 생성 (간단하게)
+        available_dataframes = list(agent_chain.df_agent.dataframes.keys())
+        if available_dataframes:
+            result_message = f"✅ 분석이 완료되었습니다. {len(available_dataframes)}개의 데이터셋을 로드했습니다: {', '.join(available_dataframes)}"
+        else:
+            result_message = "✅ 분석이 완료되었습니다."
         
         yield {
             'type': 'result',
-            'message': summary_message.strip(),
+            'message': result_message,
             'status': 'completed',
             'data': {
-                'executed_steps': executed_steps,
                 'total_steps': len(steps),
-                'dataframes_available': list(agent_chain.df_agent.dataframes.keys())
+                'dataframes_available': available_dataframes
             }
         }
         
