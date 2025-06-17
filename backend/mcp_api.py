@@ -28,6 +28,31 @@ Model Context Protocol(Mcp) KOSIS API 연동 구현체 (v3.1 - 공식 개발가�
 2.  [Metadata]: get_table_meta로 해당 통계표의 분류(CL)와 항목(ITM) 코드 정보를 모두 조회
 3.  [Querying]: fetch_kosis_data로 실제 통계 데이터를 조회 (반환: DataFrame)
 
+🤖 LLM 프롬프트 가이드 (상세 Input/Output 형식 기반):
+
+1. **통계자료 직접 조회 (최우선 권장)** - fetch_kosis_data():
+   📋 Input: api_key, orgId("101"), tblId("DT_1B040A3"), prdSe("Y"), startPrdDe("2020"), endPrdDe("2024"), itmId("T20"), objL1("00")
+   📊 Output: ORG_ID, TBL_NM, C1_NM, ITM_NM, PRD_DE, DT(수치값), UNIT_NM 등의 DataFrame
+   💡 사용법: 기관ID, 통계표ID를 정확히 알 때 가장 안정적
+   
+2. **통계목록 탐색** - get_stat_list():
+   📋 Input: api_key, vwCd("MT_ZTITLE"), parentListId("A")
+   📊 Output: VW_CD, LIST_ID, LIST_NM, ORG_ID, TBL_ID, TBL_NM 등
+   💡 사용법: 주제별/기관별 통계표를 계층적으로 탐색
+   
+3. **통계설명 조회** - get_stat_explanation():
+   📋 Input: statId("1962009"), metaItm("All")
+   📊 Output: statsNm(조사명), writingPurps(목적), examinPd(기간), dataUserNote(유의사항) 등
+   💡 사용법: 통계의 배경과 메타데이터 이해
+   
+4. **⚠️ 사용 금지** - search_and_fetch_kosis_data():
+   문제점: 복잡한 4단계 파이프라인, 각 단계별 실패 확률 높음
+   대안: fetch_kosis_data() 직접 사용
+
+프롬프트 예시:
+"2020-2024년 주민등록인구 조회" 
+→ fetch_kosis_data(api_key, "101", "DT_1B040A3", "Y", "2020", "2024", "T20", "00")
+
 # TODO (2024.06 기준, RL 기반 Text2SQL+공공API 자동화 관점)
 # - LLM+DataFrame 쿼리 파이프라인에서 바로 활용할 수 있도록 반환값/예시/테스트 보강
 # - RL reward/실행 결과 기반 피드백 구조 미구현
@@ -76,10 +101,36 @@ def search_and_fetch_kosis_data(api_key: str, keyword: str, prdSe: str = "Y", ne
 def get_stat_list(api_key: str, vwCd: str = "MT_ZTITLE", parentListId: str = "", format: str = "json") -> dict:
     """
     KOSIS 통계목록 조회 (statisticsList.do)
+    
+    📋 Input 파라미터 (공식 명세 기준):
+    - apiKey (String, 필수): 발급된 인증 key
+    - vwCd (String, 필수): 서비스뷰 코드
+      * MT_ZTITLE: 국내통계 주제별 
+      * MT_OTITLE: 국내통계 기관별
+      * MT_GTITLE01: e-지방지표(주제별)
+      * MT_GTITLE02: e-지방지표(지역별)
+      * MT_RTITLE: 국제통계
+      * MT_ETITLE: 영문 KOSIS
+    - parentId (String, 필수): 시작목록 ID
+    - format (String, 필수): 결과 유형 (json)
+    - content (String, 선택): 헤더 유형 (html, json)
+    
+    📊 Output 결과 (JSON 배열):
+    - VW_CD: 서비스뷰ID (VARCHAR2(40))
+    - VW_NM: 서비스뷰명 (VARCHAR2(300))
+    - LIST_ID: 목록ID (VARCHAR2(40))
+    - LIST_NM: 목록명 (VARCHAR2(300))
+    - ORG_ID: 기관코드 (VARCHAR2(40))
+    - TBL_ID: 통계표ID (VARCHAR2(40))
+    - TBL_NM: 통계표명 (VARCHAR2(300))
+    - STAT_ID: 통계조사ID (VARCHAR2(40))
+    - SEND_DE: 최종갱신일 (VARCHAR2(8))
+    - REC_TBL_SE: 추천 통계표 여부 (VARCHAR2(10))
+    
+    사용 예시:
+    get_stat_list(api_key, "MT_ZTITLE", "A") # 주제별 최상위 목록
+    
     - 공식 명세: https://kosis.kr/openapi/devGuide/devGuide_0101List.do
-    - 주요 파라미터: method, apiKey, vwCd, parentListId, format 등
-    - 샘플: get_stat_list(api_key="...", vwCd="MT_ZTITLE", parentListId="", format="json")
-    - 반환: 통계목록/통계표 리스트 (JSON)
     """
     url = "https://kosis.kr/openapi/statisticsList.do"
     params = {
@@ -100,10 +151,40 @@ def get_stat_list(api_key: str, vwCd: str = "MT_ZTITLE", parentListId: str = "",
 def fetch_kosis_data(api_key: str, orgId: str, tblId: str, prdSe: str = "Y", startPrdDe: str = "", endPrdDe: str = "", itmId: str = "", objL1: str = "", format: str = "json") -> pd.DataFrame:
     """
     KOSIS 통계자료 조회 (statisticsParameterData.do 방식 사용)
+    
+    📋 Input 파라미터 (공식 명세 기준):
+    - apiKey (String, 필수): 발급된 인증 key
+    - orgId (String, 필수): 기관 ID (예: "101"=통계청)
+    - tblId (String, 필수): 통계표 ID (예: "DT_1B040A3"=주민등록인구)
+    - objL1~objL8 (String, 필수): 분류1~8 코드
+    - itmId (String, 필수): 항목 ID (예: "T20"=계)
+    - prdSe (String, 필수): 수록주기 (Y=연, Q=분기, M=월, D=일, F=다년, IR=부정기)
+    - startPrdDe/endPrdDe (String, 선택): 시작/종료 수록시점
+      * Y: YYYY (예: 2024), Q: YYYYQQ (예: 202401)
+      * M: YYYYMM (예: 202401), D: YYYYMMDD (예: 20240101)
+    - newEstPrdCnt (String, 선택): 최근수록시점 개수 (시점기준 대신 사용)
+    - prdInterval (String, 선택): 수록시점 간격
+    - format (String, 필수): 결과 유형 (json)
+    
+    📊 Output 결과 (JSON 배열, pandas DataFrame 변환):
+    - ORG_ID: 기관코드 (VARCHAR2(40))
+    - TBL_ID: 통계표ID (VARCHAR2(40))
+    - TBL_NM: 통계표명 (VARCHAR2(300))
+    - C1~C8: 분류값 ID1~8 (VARCHAR2(40))
+    - C1_OBJ_NM~C8_OBJ_NM: 분류명1~8 (VARCHAR2(3000))
+    - C1_NM~C8_NM: 분류값 명1~8 (VARCHAR2(3000))
+    - ITM_ID: 항목 ID (VARCHAR2(40))
+    - ITM_NM: 항목명 (VARCHAR2(3000))
+    - UNIT_NM: 단위명 (VARCHAR2(1000))
+    - PRD_SE: 수록주기 (VARCHAR2(20))
+    - PRD_DE: 수록시점 (VARCHAR2(8))
+    - DT: 수치값 (VARCHAR2(100))
+    - LST_CHN_DE: 최종수정일 (VARCHAR2(8))
+    
+    사용 예시:
+    fetch_kosis_data(api_key, "101", "DT_1B040A3", "Y", "2020", "2024", "T20", "00")
+    
     - 공식 명세: https://kosis.kr/openapi/devGuide/devGuide_0201List.do
-    - 주요 파라미터: method, apiKey, orgId, tblId, objL1, itmId, prdSe, newEstPrdCnt 등
-    - 실제 예시: fetch_kosis_data(api_key="...", orgId="101", tblId="DT_1B040A3", objL1="", itmId="T20")
-    - 반환: 통계자료 pandas DataFrame
     """
     # 실제 작동하는 KOSIS API 엔드포인트 사용 (파라미터 방식)
     url = "https://kosis.kr/openapi/Param/statisticsParameterData.do"
@@ -345,13 +426,36 @@ def get_table_meta(table_id: str, meta_type: str) -> pd.DataFrame:
 def get_stat_explanation(stat_id: str) -> pd.DataFrame:
     """
     통계설명자료 조회
+    
+    📋 Input 파라미터 (공식 명세 기준):
+    - apiKey (String, 필수): 발급된 인증 Key
+    - statId (String, 필수): 통계조사 ID (또는 orgId+tblId 조합 가능)
+    - metaItm (String, 필수): 요청 항목
+      * All: 전체, statsNm: 조사명, statsKind: 작성유형
+      * basisLaw: 법적근거, writingPurps: 조사목적
+      * examinPd: 조사기간, statsPeriod: 조사주기
+      * dataUserNote: 자료이용시 유의사항
+      * mainTermExpl: 주요 용어해설, 기타 다수 항목
+    - format (String, 필수): 결과유형 (json)
+    - content (String, 선택): 헤더 유형 (html, json)
+    
+    📊 Output 결과 (JSON 배열):
+    - statsNm: 조사명 (VARCHAR2(4000))
+    - statsKind: 작성유형 (VARCHAR2(4000))
+    - statsEnd: 통계종류 (VARCHAR2(4000))
+    - statsContinue: 계속여부 (VARCHAR2(4000))
+    - basisLaw: 법적근거 (VARCHAR2(4000))
+    - writingPurps: 조사목적 (VARCHAR2(4000))
+    - examinPd: 조사기간 (VARCHAR2(4000))
+    - statsPeriod: 조사주기 (VARCHAR2(4000))
+    - writingSystem: 조사체계 (VARCHAR2(4000))
+    - writingTel: 연락처 (VARCHAR2(8000))
+    - 기타 20여개 상세 설명 필드...
+    
+    사용 예시:
+    get_stat_explanation("1962009") # 통계조사ID로 설명 조회
+    
     - 공식 명세: https://kosis.kr/openapi/devGuide/devGuide_0401List.do
-    - 주요 파라미터:
-        - method: 'getList'
-        - apiKey: 인증키
-        - statId: 통계조사ID
-        - format: 'json'
-    - 반환: 통계설명자료 DataFrame
     """
     params = {
         'method': 'getList',
