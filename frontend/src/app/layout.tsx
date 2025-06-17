@@ -13,21 +13,21 @@ import { Providers } from './providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Text2SQL Agent - 공공데이터 분석 플랫폼',
-  description: '자연어로 공공데이터를 분석하고 시각화하는 AI 기반 플랫폼',
-  keywords: ['Text2SQL', '공공데이터', 'AI', '데이터 분석', 'KOSIS', '통계청'],
-  authors: [{ name: 'Text2SQL Team' }],
+  title: 'AI Assistant - 통합 대화형 AI',
+  description: '일반 대화와 데이터 분석을 모두 지원하는 차세대 AI 어시스턴트',
+  keywords: ['AI Assistant', '대화형 AI', 'ChatGPT', '데이터 분석', 'KOSIS', '통계청', 'MCP'],
+  authors: [{ name: 'AI Assistant Team' }],
   robots: 'index, follow',
   openGraph: {
-    title: 'Text2SQL Agent - 공공데이터 분석 플랫폼',
-    description: '자연어로 공공데이터를 분석하고 시각화하는 AI 기반 플랫폼',
+    title: 'AI Assistant - 통합 대화형 AI',
+    description: '일반 대화와 데이터 분석을 모두 지원하는 차세대 AI 어시스턴트',
     type: 'website',
     locale: 'ko_KR',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Text2SQL Agent',
-    description: '자연어로 공공데이터를 분석하고 시각화하는 AI 기반 플랫폼',
+    title: 'AI Assistant',
+    description: '일반 대화와 데이터 분석을 모두 지원하는 차세대 AI 어시스턴트',
   },
 };
 

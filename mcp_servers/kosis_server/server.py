@@ -1,13 +1,48 @@
 #!/usr/bin/env python3
 """
-KOSIS MCP Server - 표준 MCP 프로토콜 구현
-==========================================
-Model Context Protocol을 따르는 KOSIS API 서버
+KOSIS MCP Server - 표준 MCP 프로토콜 구현 v1.0
+===============================================
 
-통신: stdio (JSON-RPC 2.0)
-도구: KOSIS 통계 데이터 조회
-리소스: 통계 메타데이터
-프롬프트: 데이터 분석 템플릿
+📋 MCP 표준 준수 사항:
+┌─────────────────────────────────────────────────────────────────┐
+│                    MCP Specification v1.0                       │
+│                 (Model Context Protocol)                        │
+│                                                                 │
+│  🔌 Transport: stdio (JSON-RPC 2.0)                             │
+│     ├── Standard Input/Output 통신                              │
+│     ├── JSON-RPC 메시지 형식                                     │
+│     └── 비동기 메시지 처리                                        │
+│                                                                 │
+│  🛠️ Server Features:                                            │
+│     ├── Tools: KOSIS API 호출 기능                              │
+│     │   ├── fetch_statistics_data                              │
+│     │   ├── search_statistics                                  │
+│     │   └── list_statistics                                    │
+│     │                                                          │
+│     ├── Resources: 메타데이터 제공                               │
+│     │   ├── statistics://metadata/{tblId}                     │
+│     │   └── statistics://explanation/{statId}                 │
+│     │                                                          │
+│     └── Prompts: 분석 템플릿 제공                                │
+│         ├── analyze_population_trend                           │
+│         └── compare_economic_indicators                        │
+│                                                                 │
+│  🔐 Security & Trust:                                           │
+│     ├── API 키 환경변수 관리                                     │
+│     ├── 입력값 검증 및 오류 처리                                 │
+│     └── 안전한 데이터 반환                                       │
+└─────────────────────────────────────────────────────────────────┘
+
+🎯 KOSIS Open API 연동:
+- URL: https://kosis.kr/openapi
+- 인증: API 키 기반 (KOSIS_OPEN_API_KEY)
+- 형식: JSON 응답
+- 도메인: 한국 통계청 공식 데이터
+
+🚀 FastMCP 사용:
+- Anthropic에서 개발한 MCP 서버 프레임워크
+- 데코레이터 기반 간편한 도구/리소스 정의
+- 자동 JSON-RPC 2.0 처리
 """
 
 import os

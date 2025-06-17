@@ -1,8 +1,50 @@
 #!/usr/bin/env python3
 """
-Text2SQL MCP 통합 시스템 시작 스크립트
-=====================================
-백엔드와 프론트엔드를 함께 시작하는 통합 스크립트
+🚀 통합 AI Assistant 시작 스크립트 v3.0
+========================================
+
+📋 시스템 구성:
+┌─────────────────────────────────────────────────────────────────┐
+│                      전체 시스템 실행                            │
+│                                                                 │
+│  1️⃣ 환경 검증                                                   │
+│     ├── Python 3.8+ 확인                                        │
+│     ├── Node.js 확인                                            │
+│     ├── OPENAI_API_KEY 확인                                      │
+│     └── KOSIS_OPEN_API_KEY 확인 (선택사항)                        │
+│                                                                 │
+│  2️⃣ 의존성 설치 (옵션)                                           │
+│     ├── Python packages (FastAPI, OpenAI, MCP)                  │
+│     └── Frontend packages (Next.js, React)                      │
+│                                                                 │
+│  3️⃣ 서비스 시작                                                  │
+│     ├── API 서버 (포트 8000)                                     │
+│     │   ├── OpenAI 클라이언트 초기화                             │
+│     │   ├── MCP 클라이언트 연결 시도                             │
+│     │   └── Fallback 시스템 준비                                │
+│     │                                                           │
+│     └── Frontend 서버 (포트 3000)                                │
+│         ├── Next.js 개발 서버                                    │
+│         ├── React 컴포넌트                                       │
+│         └── API 통신 설정                                        │
+│                                                                 │
+│  4️⃣ 상태 모니터링                                                │
+│     ├── 프로세스 상태 확인                                       │
+│     ├── API 서버 Health Check                                   │
+│     ├── MCP 연결 상태 확인                                       │
+│     └── 실시간 로그 출력                                         │
+└─────────────────────────────────────────────────────────────────┘
+
+🎯 주요 특징:
+- 완전 자동화된 시스템 시작
+- 견고한 오류 처리 및 복구
+- 실시간 상태 모니터링
+- 우아한 종료 처리 (Ctrl+C)
+
+🔧 사용법:
+1. 환경변수 설정 (.env 파일)
+2. python start_system.py 실행
+3. 웹브라우저에서 http://localhost:3000 접속
 """
 
 import os
@@ -10,7 +52,6 @@ import sys
 import subprocess
 import time
 import signal
-import threading
 from pathlib import Path
 
 # 색상 코드
@@ -28,19 +69,19 @@ class SystemLauncher:
     def print_banner(self):
         print(f"""
 {BLUE}╔═══════════════════════════════════════════════════════════╗
-║       Text2SQL MCP (Model Context Protocol) System        ║
+║         통합 AI Assistant System v3.0                      ║
+║     General Chat + Data Analysis with MCP                  ║
 ╚═══════════════════════════════════════════════════════════╝{RESET}
 
-{GREEN}🚀 시스템 구성:{RESET}
-├── 📊 KOSIS MCP Server (포트: stdio)
-├── 🔧 MCP Client Application (포트: 8100)
-├── 🌐 Backend API Server (포트: 8000)
+{GREEN}🤖 시스템 구성:{RESET}
+├── 🧠 OpenAI GPT (일반 대화)
+├── 📊 KOSIS MCP Server (데이터 분석)
+├── 🌐 통합 API 서버 (포트: 8000)
 └── 🎨 Frontend Next.js (포트: 3000)
 
 {YELLOW}📝 필수 환경변수 (.env 파일):{RESET}
-- KOSIS_OPEN_API_KEY: KOSIS API 키
 - OPENAI_API_KEY: OpenAI API 키
-- OPENAI_MODEL: 사용할 모델 (기본: gpt-3.5-turbo)
+- KOSIS_OPEN_API_KEY: KOSIS API 키
 """)
         
     def check_requirements(self):
@@ -62,8 +103,16 @@ class SystemLauncher:
             return False
             
         # 환경변수 확인
-        if not os.getenv('OPENAI_API_KEY') and not os.getenv('KOSIS_OPEN_API_KEY'):
-            print(f"{YELLOW}⚠️  API 키가 설정되지 않았습니다. .env 파일을 확인하세요.{RESET}")
+        if not os.getenv('OPENAI_API_KEY'):
+            print(f"{RED}❌ OPENAI_API_KEY가 설정되지 않았습니다.{RESET}")
+            return False
+        else:
+            print(f"{GREEN}✅ OpenAI API 키 설정됨{RESET}")
+            
+        if not os.getenv('KOSIS_OPEN_API_KEY'):
+            print(f"{YELLOW}⚠️  KOSIS_OPEN_API_KEY가 설정되지 않았습니다. 데이터 분석 기능이 제한될 수 있습니다.{RESET}")
+        else:
+            print(f"{GREEN}✅ KOSIS API 키 설정됨{RESET}")
             
         return True
         
@@ -73,40 +122,34 @@ class SystemLauncher:
         
         # Python 패키지 설치
         print(f"{YELLOW}Installing Python packages...{RESET}")
-        subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', 'requirements.txt'])
+        requirements = [
+            "fastapi",
+            "uvicorn",
+            "openai",
+            "mcp",
+            "python-dotenv",
+            "pandas",
+            "requests"
+        ]
+        
+        for package in requirements:
+            subprocess.run([sys.executable, '-m', 'pip', 'install', package])
         
         # Frontend 패키지 설치
-        print(f"{YELLOW}Installing Node packages...{RESET}")
+        print(f"{YELLOW}Installing Frontend packages...{RESET}")
         os.chdir(self.root_dir / 'frontend')
         subprocess.run(['npm', 'install'])
         os.chdir(self.root_dir)
         
-    def start_kosis_server(self):
-        """KOSIS MCP Server 시작"""
-        print(f"\n{GREEN}🚀 KOSIS MCP Server 시작 중...{RESET}")
-        # MCP 서버는 클라이언트가 자동으로 시작함
-        return True
-        
-    def start_mcp_application(self):
-        """MCP Client Application 시작"""
-        print(f"\n{GREEN}🚀 MCP Client Application 시작 중...{RESET}")
+    def start_api_server(self):
+        """통합 API 서버 시작"""
+        print(f"\n{GREEN}🚀 통합 API 서버 시작 중...{RESET}")
         proc = subprocess.Popen(
-            [sys.executable, 'application/main.py'],
+            [sys.executable, 'api_server.py'],
             cwd=self.root_dir
         )
         self.processes.append(proc)
-        time.sleep(3)  # 초기화 대기
-        return True
-        
-    def start_backend(self):
-        """Backend API Server 시작"""
-        print(f"\n{GREEN}🚀 Backend API Server 시작 중...{RESET}")
-        proc = subprocess.Popen(
-            [sys.executable, 'backend/integrated_api_server.py'],
-            cwd=self.root_dir
-        )
-        self.processes.append(proc)
-        time.sleep(3)  # 서버 시작 대기
+        time.sleep(5)  # 서버 시작 대기
         return True
         
     def start_frontend(self):
@@ -120,13 +163,34 @@ class SystemLauncher:
         self.processes.append(proc)
         return True
         
+    def test_api_connection(self):
+        """API 서버 연결 테스트"""
+        import requests
+        try:
+            response = requests.get("http://localhost:8000/health", timeout=5)
+            if response.status_code == 200:
+                print(f"{GREEN}✅ API 서버 정상 작동 중{RESET}")
+                health_data = response.json()
+                if health_data.get('openai'):
+                    print(f"{GREEN}  - OpenAI 연결 상태: ✅{RESET}")
+                if health_data.get('mcp_servers'):
+                    print(f"{GREEN}  - MCP 서버 수: {len(health_data['mcp_servers'])}{RESET}")
+                return True
+        except:
+            pass
+        return False
+        
     def monitor_processes(self):
         """프로세스 모니터링"""
         print(f"\n{GREEN}✅ 모든 서비스가 시작되었습니다!{RESET}")
         print(f"\n{BLUE}📌 접속 정보:{RESET}")
         print(f"- Frontend: http://localhost:3000")
-        print(f"- Backend API: http://localhost:8000")
+        print(f"- API 서버: http://localhost:8000")
         print(f"- API 문서: http://localhost:8000/docs")
+        print(f"- Health Check: http://localhost:8000/health")
+        print(f"\n{YELLOW}💡 사용 팁:{RESET}")
+        print(f"- 일반 대화: '안녕하세요', '오늘 날씨 어때?', '지금 몇 시야?'")
+        print(f"- 데이터 분석: '인구 통계 보여줘', 'GDP 추이 분석해줘'")
         print(f"\n{YELLOW}종료하려면 Ctrl+C를 누르세요.{RESET}")
         
         try:
@@ -163,9 +227,17 @@ class SystemLauncher:
             self.install_dependencies()
             
         # 서비스 시작
-        if not self.start_backend():
-            print(f"{RED}Backend 시작 실패{RESET}")
+        if not self.start_api_server():
+            print(f"{RED}API 서버 시작 실패{RESET}")
             sys.exit(1)
+            
+        # API 서버 연결 테스트
+        print(f"\n{BLUE}🔍 API 서버 연결 테스트 중...{RESET}")
+        time.sleep(3)
+        if self.test_api_connection():
+            print(f"{GREEN}✅ API 서버 준비 완료!{RESET}")
+        else:
+            print(f"{YELLOW}⚠️  API 서버 응답이 느립니다. 계속 진행합니다.{RESET}")
             
         if not self.start_frontend():
             print(f"{RED}Frontend 시작 실패{RESET}")

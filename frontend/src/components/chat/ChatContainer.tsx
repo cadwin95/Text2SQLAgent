@@ -84,16 +84,23 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     }
 
     // 서버 상태 확인
-    checkServerHealth().then((healthy) => {
-      setIsConnected(healthy);
-      setConnectionStatus(healthy);
+    checkServerHealth().then((health) => {
+      setIsConnected(health.status);
+      setConnectionStatus(health.status);
     });
 
     // 초기 환영 메시지 추가 (세션에 메시지가 없는 경우)
     if (sessionId && (!currentSession || currentSession.messages.length === 0)) {
       const welcomeMessage: Message = {
         id: `welcome-${Date.now()}`,
-        content: '안녕하세요! Text2SQL Agent입니다. 공공데이터 분석에 대해 질문해보세요.',
+        content: `안녕하세요! 🤖 통합 AI Assistant입니다.
+
+💬 **일반 대화**: 시간, 날씨, 설명 등 무엇이든 물어보세요
+📊 **데이터 분석**: 한국 통계청(KOSIS) 데이터 분석도 가능합니다
+
+예시 질문:
+• "안녕하세요!" / "오늘 몇 시야?"
+• "인구 통계 보여줘" / "GDP 분석해줘"`,
         role: 'assistant',
         timestamp: new Date(),
       };
@@ -142,11 +149,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     // 스트리밍 응답을 위한 임시 메시지 ID
     const streamingMessageId = `streaming-${Date.now()}`;
     
-    // 간단한 메시지 누적
-    let currentContent = '';
+    // 메시지 누적
+    let fullContent = '';
     let isStreamingMessageAdded = false;
-    let accumulatedChartData: any = null;
-    let accumulatedTableData: any = null;
+    let questionType: 'general' | 'data_analysis' | null = null;
 
     try {
       // 스트리밍 API 호출
@@ -157,69 +163,59 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
           previousMessages: messages.slice(-5), // 최근 5개 메시지만 컨텍스트로 전송
         },
       }, (update) => {
-        console.log('스트리밍 업데이트:', update);
+        console.log('🔄 스트리밍 업데이트:', update);
 
-        // 완료된 단계만 추가 (중복 방지)
-        if (update.type === 'start') {
-          currentContent = `🚀 ${update.message}\n\n`;
-        } else if (update.type === 'planning' && update.status === 'completed') {
-          currentContent += `✅ 계획 수립 완료: ${update.data?.steps?.length || 0}개 단계\n`;
-          if (update.data?.steps) {
-            currentContent += update.data.steps.map((step: string, index: number) => 
-              `${index + 1}. ${step}`
-            ).join('\n') + '\n\n';
-          }
-        } else if (update.type === 'tool_call' && update.status === 'completed') {
-          currentContent += `✅ 도구 실행 완료: ${update.tool_name || 'Unknown'}\n\n`;
-        } else if (update.type === 'query' && update.status === 'completed') {
-          currentContent += `✅ 쿼리 실행 완료\n\n`;
-        } else if (update.type === 'visualization') {
-          currentContent += `⚙️ **✅ 단계 ${update.step_number}: ${update.description}**\n\n`;
-          if (update.chart_data) {
-            currentContent += `📊 **차트가 생성되었습니다:**\n\n`;
-            accumulatedChartData = update.chart_data; // 차트 데이터 누적
-          }
-          if (update.table_data) {
-            currentContent += `📋 **테이블이 생성되었습니다:**\n\n`;
-            accumulatedTableData = update.table_data; // 테이블 데이터 누적
-          }
-        } else if (update.type === 'result') {
-          currentContent += `📈 **${update.message}**\n`;
-        } else if (update.type === 'error') {
-          currentContent += `❌ **오류 발생**\n${update.message}\n\n`;
-        }
+        if (update.type === 'content') {
+          // 실시간 콘텐츠 스트리밍
+          fullContent = update.fullContent || fullContent + update.content;
+          questionType = update.questionType || questionType;
 
-        // 데이터 누적 (다른 업데이트 타입에서도 차트/테이블 데이터가 올 수 있음)
-        if (update.chart_data && !accumulatedChartData) {
-          accumulatedChartData = update.chart_data;
-        }
-        if (update.table_data && !accumulatedTableData) {
-          accumulatedTableData = update.table_data;
-        }
+          // 첫 번째 업데이트에서만 메시지 추가
+          if (!isStreamingMessageAdded) {
+            const streamingMessage: Message = {
+              id: streamingMessageId,
+              content: fullContent,
+              role: 'assistant',
+              timestamp: new Date(),
+              metadata: {
+                isStreaming: true,
+                queryType: questionType === 'data_analysis' ? 'analysis' : 'text2sql',
+                dataSource: questionType === 'data_analysis' ? 'kosis' : 'openai'
+              }
+            };
+            addMessage(activeSessionId, streamingMessage);
+            isStreamingMessageAdded = true;
+          } else {
+            // 기존 메시지 업데이트
+            updateMessage(activeSessionId, streamingMessageId, {
+              content: fullContent,
+              metadata: {
+                isStreaming: true,
+                queryType: questionType === 'data_analysis' ? 'analysis' : 'text2sql',
+                dataSource: questionType === 'data_analysis' ? 'kosis' : 'openai'
+              }
+            });
+          }
+        } else if (update.type === 'complete') {
+          // 스트리밍 완료
+          fullContent = update.content || fullContent;
+          questionType = update.questionType || questionType;
 
-        // 첫 번째 업데이트에서만 메시지 추가, 이후는 업데이트만
-        if (!isStreamingMessageAdded) {
-          const streamingMessage: Message = {
-            id: streamingMessageId,
-            content: currentContent,
-            role: 'assistant',
-            timestamp: new Date(),
-            metadata: {
-              isStreaming: update.type !== 'done' && update.type !== 'result',
-              chartData: accumulatedChartData,
-              tableData: accumulatedTableData
-            }
-          };
-          addMessage(activeSessionId, streamingMessage);
-          isStreamingMessageAdded = true;
-        } else {
-          // 기존 메시지 업데이트
           updateMessage(activeSessionId, streamingMessageId, {
-            content: currentContent,
+            content: fullContent,
             metadata: {
-              isStreaming: update.type !== 'done' && update.type !== 'result',
-              chartData: accumulatedChartData,
-              tableData: accumulatedTableData
+              isStreaming: false,
+              queryType: questionType === 'data_analysis' ? 'analysis' : 'text2sql',
+              dataSource: questionType === 'data_analysis' ? 'kosis' : 'openai'
+            }
+          });
+        } else if (update.type === 'error') {
+          // 오류 처리
+          updateMessage(activeSessionId, streamingMessageId, {
+            content: `❌ 오류가 발생했습니다: ${update.message}`,
+            error: update.message,
+            metadata: {
+              isStreaming: false
             }
           });
         }
@@ -325,9 +321,11 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         }
         maxLength={2000}
         suggestions={[
+          "안녕하세요!",
+          "오늘 몇 시야?",
           "한국의 인구 통계를 보여주세요",
-          "서울시 부동산 가격 동향을 분석해주세요",
-          "최근 5년간 GDP 성장률을 비교해주세요"
+          "GDP 성장률을 분석해주세요",
+          "파이썬 코드 작성 도와줘"
         ]}
         isLoading={isLoading}
       />
