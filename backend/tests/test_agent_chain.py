@@ -1,3 +1,13 @@
+# test_agent_chain.py
+# ==================
+# AgentChain 모듈 단위/통합 테스트 파일
+# - 계획-실행-반성 파이프라인의 정상 동작/예외 처리/응답 구조 검증
+# - Text2SQL + KOSIS API + DataFrame 쿼리 통합 시나리오 테스트
+# - Tool 호출, DataFrame 관리, 오류 복구 등 핵심 기능 검증
+# - 자동화 테스트/CI 연동, MCP 파이프라인 안정성 보장 목적
+# - OpenAI API 기반 실제 LLM 호출을 통한 End-to-End 테스트
+# - 자세한 설계/구현 규칙은 .cursor/rules/rl-text2sql-public-api.md 참고
+
 import os
 import pytest
 import sys

@@ -1,3 +1,14 @@
+# test_text2sql_agent.py
+# ======================
+# Text2DFQueryAgent 모듈 단위/통합 테스트 파일
+# - DataFrame 기반 SQL 쿼리 생성/실행/결과 구조화 검증
+# - SQLite 메모리 DB 연동, 테이블 스키마 관리, 쿼리 안전성 검증
+# - 다중 DataFrame 조인, Series 결과 처리, 오류 처리 등 핵심 기능 테스트
+# - LLM 기반 자연어→SQL 변환 정확성 및 코드 정리 기능 검증
+# - pandas 데이터 타입별 처리, 마크다운 코드 블록 제거 등 세부 기능 테스트
+# - 자동화 테스트/CI 연동, Text2SQL 파이프라인 안정성 보장 목적
+# - 자세한 설계/구현 규칙은 .cursor/rules/rl-text2sql-public-api.md 참고
+
 import os
 import pytest
 import pandas as pd

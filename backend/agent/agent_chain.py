@@ -1,3 +1,15 @@
+# agent_chain.py
+# ==============
+# LLM 기반 AgentChain: 계획-실행-반성 파이프라인 구현
+# - Text2SQL + 공공API + DataFrame 쿼리를 통합한 지능형 에이전트
+# - Plan → Execute → Reflect → Replan 사이클로 복잡한 데이터 분석 질의 처리
+# - KOSIS API 연동을 통한 공공데이터 자동 조회 및 분석
+# - Text2DFQueryAgent와 연동하여 DataFrame 기반 SQL 쿼리 실행
+# - MCP(Model Context Protocol) 도구 체인을 활용한 확장 가능한 아키텍처
+# - 실패 시 자동 재계획 및 대안 전략 수립 (최대 3회 반복)
+# - OpenAI API, HuggingFace, GGUF 등 다양한 LLM 백엔드 지원
+# - 자세한 설계/구현 규칙은 .cursor/rules/rl-text2sql-public-api.md 참고
+
 import os
 import sys
 import json
