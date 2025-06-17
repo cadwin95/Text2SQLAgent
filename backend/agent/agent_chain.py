@@ -3,9 +3,8 @@
 # LLM 기반 AgentChain: 계획-실행-반성 파이프라인 구현
 # - Text2SQL + 공공API + DataFrame 쿼리를 통합한 지능형 에이전트
 # - Plan → Execute → Reflect → Replan 사이클로 복잡한 데이터 분석 질의 처리
-# - KOSIS API 연동을 통한 공공데이터 자동 조회 및 분석
+# - KOSIS API 연동을 통한 공공데이터 자동 조회 및 분석 (FastMCP 기반)
 # - Text2DFQueryAgent와 연동하여 DataFrame 기반 SQL 쿼리 실행
-# - MCP(Model Context Protocol) 도구 체인을 활용한 확장 가능한 아키텍처
 # - 실패 시 자동 재계획 및 대안 전략 수립 (최대 3회 반복)
 # - OpenAI API, HuggingFace, GGUF 등 다양한 LLM 백엔드 지원
 # - 자세한 설계/구현 규칙은 .cursor/rules/rl-text2sql-public-api.md 참고
@@ -20,39 +19,48 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agent.text2sql_agent import Text2DFQueryAgent
 from llm_client import get_llm_client
-from mcp_api import fetch_kosis_data, get_stat_list
 
+# 새로운 깔끔한 MCP API 클라이언트 사용
+try:
+    from mcp_api_v2 import fetch_kosis_data, get_stat_list, convert_to_dataframe
+    print("[AgentChain] 새로운 FastMCP 기반 KOSIS API 사용")
+except ImportError:
+    # 백업용 기존 API
+    from mcp_api import fetch_kosis_data, get_stat_list
+    convert_to_dataframe = lambda x: pd.DataFrame(x.get("data", []))
+    print("[AgentChain] 기존 KOSIS API 사용")
+
+# 깔끔한 MCP 도구 명세 (검증된 도구만)
 MCP_TOOL_SPECS = [
     {
         "tool_name": "fetch_kosis_data",
-        "description": "KOSIS 통계자료 조회 (권장)",
-        "params": ["orgId", "tblId", "prdSe", "startPrdDe", "endPrdDe", "itmId", "objL1", "format"],
+        "description": "KOSIS 통계자료 직접 조회 (권장)",
+        "params": ["orgId", "tblId", "prdSe", "startPrdDe", "endPrdDe", "itmId", "objL1"],
         "examples": [
             {
-                "description": "행정구역별 인구수 조회",
-                "params": {"orgId": "101", "tblId": "DT_1B040A3", "prdSe": "Y", "startPrdDe": "2020", "endPrdDe": "2024"}
+                "description": "2020-2024 전국 인구수 조회",
+                "params": {"orgId": "101", "tblId": "DT_1B040A3", "prdSe": "Y", "startPrdDe": "2020", "endPrdDe": "2024", "itmId": "T20", "objL1": "00"}
             },
             {
                 "description": "최근 5년 인구 통계",
-                "params": {"orgId": "101", "tblId": "DT_1B040A3", "prdSe": "Y", "newEstPrdCnt": "5"}
+                "params": {"orgId": "101", "tblId": "DT_1B040A3", "prdSe": "Y", "itmId": "T20", "objL1": "00"}
             }
         ]
     },
     {
-        "tool_name": "get_stat_list",
-        "description": "KOSIS 통계목록 조회 (메타데이터)",
+        "tool_name": "get_stat_list", 
+        "description": "KOSIS 통계목록 탐색 (메타데이터)",
         "params": ["vwCd", "parentListId", "format"]
     }
 ]
+
 MCP_TOOL_SPEC_STR = json.dumps({"available_tools": MCP_TOOL_SPECS}, ensure_ascii=False)
 
 class AgentChain:
     """
     AgentChain: LLM 기반 DataFrame 쿼리/분석 계획-실행-반성(재계획) 파이프라인
-    - MCP Tool 목록/명세/파라미터를 system 프롬프트에 명시
-    - 질문은 user role로 분리
-    - tool_call step의 tool_name은 MCP Tool 목록 중 하나만 사용
-    - output: {"history": [...], "remaining_plan": [...], "final_result": ..., "error": ...}
+    - 검증된 MCP Tool만 사용 (DEPRECATED 함수 제거)
+    - FastMCP 기반 깔끔한 API 구조
     - 모든 쿼리/분석/Tool 호출은 DataFrame 기반으로 처리
     """
     def __init__(self, backend="openai", model=None, **llm_kwargs):
@@ -66,19 +74,21 @@ class AgentChain:
 
     def plan_with_llm(self, question, schema):
         system_prompt = """
-KOSIS 도구: fetch_kosis_data(orgId, tblId, prdSe, startPrdDe, endPrdDe)
+KOSIS 도구 (검증됨):
+1. fetch_kosis_data - 통계자료 직접 조회 (권장)
+2. get_stat_list - 통계목록 탐색
 
 검증된 테이블:
-- 인구수: orgId="101", tblId="DT_1B040A3"
+- 인구: orgId="101", tblId="DT_1B040A3", itmId="T20", objL1="00"
 
 규칙:
-1. 인구 관련: orgId="101", tblId="DT_1B040A3" 사용
-2. 최근 5년: startPrdDe="2020", endPrdDe="2024"
-3. 부동산/GDP 등은 인구 데이터로 대체 분석
+1. 인구 관련 질문 → fetch_kosis_data 직접 사용
+2. 시점: startPrdDe="2020", endPrdDe="2024" (최근 5년)
+3. 다른 주제도 인구 데이터로 대체 분석 가능
 
 JSON만 반환하세요:
 {"steps": [
-  {"type": "tool_call", "description": "설명", "tool_name": "fetch_kosis_data", "params": {...}},
+  {"type": "tool_call", "tool_name": "fetch_kosis_data", "params": {...}},
   {"type": "query", "description": "데이터 분석"},
   {"type": "visualization", "description": "시각화"}
 ]}
@@ -89,14 +99,12 @@ JSON만 반환하세요:
         ]
         
         try:
-            # 토큰 제한을 늘려서 응답 잘림 방지
             plan_str = self.llm.chat(messages, model=self.model, max_tokens=500)
             
-            # JSON 부분만 추출 시도
+            # JSON 부분만 추출
             if plan_str.strip().startswith('{'):
                 plan_json = json.loads(plan_str)
             else:
-                # 중괄호로 시작하는 부분 찾기
                 start_idx = plan_str.find('{')
                 end_idx = plan_str.rfind('}') + 1
                 if start_idx != -1 and end_idx > start_idx:
@@ -110,30 +118,25 @@ JSON만 반환하세요:
             
         except Exception as e:
             print(f"[계획 수립 실패] {e}, 기본 계획 사용")
-            # 기본 계획 생성
-            if "인구" in question or "population" in question.lower():
-                steps = [
-                    {
-                        "type": "tool_call",
-                        "description": "KOSIS에서 한국 행정구역별 인구수 조회",
-                        "tool_name": "fetch_kosis_data",
-                        "params": {"orgId": "101", "tblId": "DT_1B040A3", "prdSe": "Y", "startPrdDe": "2020", "endPrdDe": "2024"}
-                    },
-                    {"type": "query", "description": "조회한 인구 데이터 분석 및 요약"},
-                    {"type": "visualization", "description": "인구 변화 시각화"}
-                ]
-            else:
-                # 다른 질문도 인구 데이터로 대체 분석
-                steps = [
-                    {
-                        "type": "tool_call",
-                        "description": f"{question} 관련 데이터로 인구 통계 조회",
-                        "tool_name": "fetch_kosis_data",
-                        "params": {"orgId": "101", "tblId": "DT_1B040A3", "prdSe": "Y", "startPrdDe": "2020", "endPrdDe": "2024"}
-                    },
-                    {"type": "query", "description": f"{question}와 관련된 인구 데이터 분석"},
-                    {"type": "visualization", "description": "데이터 변화 시각화"}
-                ]
+            # 기본 계획: 검증된 인구 통계 조회
+            steps = [
+                {
+                    "type": "tool_call",
+                    "description": f"{question} 관련 인구 통계 조회",
+                    "tool_name": "fetch_kosis_data",
+                    "params": {
+                        "orgId": "101", 
+                        "tblId": "DT_1B040A3", 
+                        "prdSe": "Y", 
+                        "startPrdDe": "2020", 
+                        "endPrdDe": "2024",
+                        "itmId": "T20",
+                        "objL1": "00"
+                    }
+                },
+                {"type": "query", "description": f"{question}와 관련된 데이터 분석"},
+                {"type": "visualization", "description": "데이터 시각화"}
+            ]
         
         return steps
 
@@ -143,33 +146,39 @@ JSON만 반환하세요:
             for i, h in enumerate(history)
         )
         prev_steps_str = json.dumps(prev_steps, ensure_ascii=False)
+        
         system_prompt = f"""
-아래는 현재 사용 가능한 MCP Tool 목록/명세/파라미터입니다. 반드시 tool_call step의 tool_name은 이 목록 중 하나만 사용하세요.
+검증된 MCP Tool 목록:
 {MCP_TOOL_SPEC_STR}
 
-**중요: 이전 시도에서 get_stat_list가 실패했다면 fetch_kosis_data를 직접 사용하세요.**
-**현재 실제 작동하는 테이블: orgId="101", tblId="DT_1B040A3" (인구 데이터)**
+**중요: 검증된 통계표만 사용하세요**
+- 인구: orgId="101", tblId="DT_1B040A3"
+- DEPRECATED 함수는 사용 금지
 """
+        
         user_prompt = f"""
-이전 모든 시도 이력:
+이전 시도 이력:
 {history_str}
-[현재 상황]
-이전 계획 steps(JSON): {prev_steps_str}
-실행 결과: {prev_result}
-오류/이상치: {prev_error}
-질문: {question}
-스키마: {schema}
-- 반드시 JSON steps 구조로 새로운 계획을 반환하세요.
-- 이전과 동일한 계획/행동을 반복하지 말고, 새로운 해결책을 제시하세요.
-- 현재 실제 작동하는 테이블만 사용하세요: orgId="101", tblId="DT_1B040A3"
-- 필요하다면 tool_call, 쿼리 조건 변경, 요약 등 다양한 전략을 시도하세요.
+
+현재 상황:
+- 이전 계획: {prev_steps_str}
+- 실행 결과: {prev_result}
+- 오류: {prev_error}
+- 질문: {question}
+
+새로운 JSON 계획을 반환하세요:
+- 검증된 도구만 사용
+- 이전과 다른 접근 시도
+- 실패 원인 분석 후 개선
 """
+        
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ]
-        plan_str = self.llm.chat(messages, model=self.model)
+        
         try:
+            plan_str = self.llm.chat(messages, model=self.model)
             plan_json = json.loads(plan_str)
             steps = plan_json.get("steps", [])
         except Exception:
@@ -177,7 +186,7 @@ JSON만 반환하세요:
         return steps
 
     def execute_step(self, step):
-        """개별 스텝 실행 (스트리밍용)"""
+        """개별 스텝 실행 (깔끔한 구조)"""
         step_type = step.get("type")
         desc = step.get("description", "")
         result = None
@@ -186,125 +195,31 @@ JSON만 반환하세요:
         try:
             if step_type == "query":
                 # DataFrame 쿼리 실행
-                result = self.df_agent.run(desc)  # description을 쿼리로 사용
+                result = self.df_agent.run(desc)
                 step_error = result.get("error")
                 
             elif step_type == "visualization":
                 # 시각화 단계
-                result = {"msg": f"시각화({step.get('method', 'chart')}) 단계 실행 완료"}
+                result = {"msg": f"시각화({step.get('method', 'chart')}) 단계 완료"}
                 
             elif step_type == "tool_call":
-                # 툴 호출
+                # 검증된 툴만 호출
                 tool_name = step.get("tool_name")
                 params = step.get("params", {})
                 
                 if tool_name == "fetch_kosis_data":
-                    try:
-                        api_key = os.environ.get("KOSIS_OPEN_API_KEY")
-                        orgId = params.get("orgId")
-                        tblId = params.get("tblId")
-                        prdSe = params.get("prdSe", "Y")
-                        startPrdDe = params.get("startPrdDe", "")
-                        endPrdDe = params.get("endPrdDe", "")
-                        itmId = params.get("itmId", "")
-                        objL1 = params.get("objL1", "")
-                        format_ = params.get("format", "json")
-                        
-                        if not (api_key and orgId and tblId):
-                            raise ValueError("필수 파라미터(orgId, tblId, api_key)가 누락됨")
-                            
-                        # 인구 관련 질의인 경우 적절한 파라미터 설정
-                        if "인구" in params.get("description", "").lower() or "population" in params.get("description", "").lower():
-                            # 실제 인구 통계 파라미터 사용
-                            orgId = "101"  # 통계청
-                            tblId = "DT_1B040A3"  # 주민등록인구 통계표
-                            itmId = "T20"  # 계 (총인구)
-                            objL1 = ""  # 전국
-                            print(f"[인구 통계] 실제 KOSIS 파라미터 사용: orgId={orgId}, tblId={tblId}, itmId={itmId}")
-                        
-                        df = fetch_kosis_data(api_key, orgId, tblId, prdSe, startPrdDe, endPrdDe, itmId, objL1, format_)
-                        
-                        # DataFrame이 성공적으로 로드되었는지 확인
-                        if not df.empty:
-                            print(f"[KOSIS 데이터 성공] {len(df)}행의 실제 데이터 로드됨")
-                            print(f"[데이터 컬럼] {list(df.columns)}")
-                            if len(df) > 0:
-                                print(f"[데이터 샘플] {df.head(2).to_dict('records')}")
-                        
-                        # DataFrame 저장 및 SQL 테이블 등록
-                        df_name = f"{tool_name}_{tblId}"
-                        self.df_agent.dataframes[df_name] = df
-                        # SQL 테이블로도 등록
-                        table_name = self.df_agent.register_dataframe(df_name, df)
-                        result = {
-                            "msg": f"Tool({tool_name}) 호출 및 DataFrame 적재 완료",
-                            "df_shape": df.shape,
-                            "df_name": df_name,
-                            "table_name": table_name
-                        }
-                    except Exception as e:
-                        result = {"error": f"KOSIS Tool 호출 실패: {e}", "params": params}
-                        step_error = str(e)
-                        
-                # search_and_fetch_kosis_data는 DEPRECATED - fetch_kosis_data 사용 권장
-                elif tool_name == "search_and_fetch_kosis_data":
-                    print("⚠️ 경고: search_and_fetch_kosis_data는 DEPRECATED입니다. fetch_kosis_data를 사용하세요.")
-                    # 대신 fetch_kosis_data로 인구 데이터 조회
-                    try:
-                        api_key = os.environ.get("KOSIS_OPEN_API_KEY")
-                        if not api_key:
-                            api_key = "test_key"
-                        
-                        # 기본 인구 통계표로 조회
-                        df = fetch_kosis_data(
-                            api_key=api_key, 
-                            orgId="101", 
-                            tblId="DT_1B040A3", 
-                            prdSe="Y", 
-                            startPrdDe="2020", 
-                            endPrdDe="2024"
-                        )
-                        
-                        df_name = f"kosis_population_data"
-                        self.df_agent.dataframes[df_name] = df
-                        table_name = self.df_agent.register_dataframe(df_name, df)
-                        
-                        result = {
-                            "msg": f"Tool({tool_name}) DEPRECATED - fetch_kosis_data로 대체 실행됨",
-                            "df_shape": df.shape,
-                            "df_name": df_name,
-                            "table_name": table_name,
-                            "note": "향후 fetch_kosis_data를 직접 사용하세요"
-                        }
-                    except Exception as e:
-                        result = {"error": f"대체 Tool 호출 실패: {e}", "params": params}
-                        step_error = str(e)
-                        
+                    result = self._execute_fetch_kosis_data(params)
+                    step_error = result.get("error")
+                    
                 elif tool_name == "get_stat_list":
-                    try:
-                        api_key = os.environ.get("KOSIS_OPEN_API_KEY")
-                        vwCd = params.get("vwCd", "MT_ZTITLE")
-                        parentListId = params.get("parentListId", "")
-                        format_ = params.get("format", "json")
-                        
-                        if not api_key:
-                            raise ValueError("KOSIS_OPEN_API_KEY 환경변수가 누락됨")
-                            
-                        stat_list = get_stat_list(api_key, vwCd, parentListId, format_)
-                        result = {
-                            "msg": f"Tool({tool_name}) 호출 완료",
-                            "stat_count": len(stat_list) if isinstance(stat_list, list) else 1,
-                            "stat_list": stat_list
-                        }
-                    except Exception as e:
-                        result = {"error": f"KOSIS 통계목록 조회 실패: {e}", "params": params}
-                        step_error = str(e)
-                        
+                    result = self._execute_get_stat_list(params)
+                    step_error = result.get("error")
+                    
                 else:
-                    result = {"msg": f"알 수 없는 Tool({tool_name})", "params": params}
-                    step_error = f"지원하지 않는 도구: {tool_name}"
+                    result = {"error": f"지원하지 않는 도구: {tool_name}"}
+                    step_error = f"알 수 없는 도구: {tool_name}"
             else:
-                result = {"msg": f"알 수 없는 step type: {step_type}"}
+                result = {"error": f"알 수 없는 step type: {step_type}"}
                 step_error = "step type 오류"
                 
         except Exception as e:
@@ -318,149 +233,128 @@ JSON만 반환하세요:
             "description": desc
         }
 
+    def _execute_fetch_kosis_data(self, params):
+        """KOSIS 데이터 조회 실행"""
+        try:
+            api_key = os.environ.get("KOSIS_OPEN_API_KEY", "")
+            
+            # 필수 파라미터 확인
+            orgId = params.get("orgId")
+            tblId = params.get("tblId")
+            
+            if not (orgId and tblId):
+                return {"error": "필수 파라미터(orgId, tblId)가 누락됨", "params": params}
+            
+            # API 호출
+            result = fetch_kosis_data(
+                orgId=orgId,
+                tblId=tblId,
+                prdSe=params.get("prdSe", "Y"),
+                startPrdDe=params.get("startPrdDe", ""),
+                endPrdDe=params.get("endPrdDe", ""),
+                itmId=params.get("itmId", ""),
+                objL1=params.get("objL1", ""),
+                api_key=api_key
+            )
+            
+            # DataFrame 변환 및 저장
+            if "data" in result and result["data"]:
+                df = convert_to_dataframe(result)
+                if not df.empty:
+                    df_name = f"kosis_{tblId}"
+                    self.df_agent.dataframes[df_name] = df
+                    table_name = self.df_agent.register_dataframe(df_name, df)
+                    
+                    return {
+                        "msg": f"KOSIS 데이터 조회 성공: {len(df)}행",
+                        "df_shape": df.shape,
+                        "df_name": df_name,
+                        "table_name": table_name,
+                        "data_preview": df.head(3).to_dict('records') if len(df) > 0 else []
+                    }
+            
+            return {"error": "빈 데이터 또는 조회 실패", "result": result}
+            
+        except Exception as e:
+            return {"error": f"KOSIS 데이터 조회 오류: {e}", "params": params}
+
+    def _execute_get_stat_list(self, params):
+        """KOSIS 통계목록 조회 실행"""
+        try:
+            api_key = os.environ.get("KOSIS_OPEN_API_KEY", "")
+            
+            result = get_stat_list(
+                vwCd=params.get("vwCd", "MT_ZTITLE"),
+                parentListId=params.get("parentListId", ""),
+                format=params.get("format", "json"),
+                api_key=api_key
+            )
+            
+            if "data" in result:
+                return {
+                    "msg": f"통계목록 조회 성공: {result.get('count', 0)}개",
+                    "stat_count": result.get('count', 0),
+                    "stat_list_preview": result["data"][:5] if result["data"] else []
+                }
+            
+            return {"error": "통계목록 조회 실패", "result": result}
+            
+        except Exception as e:
+            return {"error": f"통계목록 조회 오류: {e}", "params": params}
+
     def run(self, question, max_reflection_steps=3):
+        """메인 실행 함수 (기존 호환성 유지)"""
         # 기본 스키마 생성
         schema = f"""
 사용 가능한 데이터:
 - KOSIS 통계 데이터 (fetch_kosis_data 도구 사용)
-- 기존 로드된 DataFrame들: {list(self.df_agent.dataframes.keys())}
+- 기존 DataFrame: {list(self.df_agent.dataframes.keys())}
 """
+        
         steps = self.plan_with_llm(question, schema)
         history = []
         error = None
-        executed_steps = []
+        
         for step_idx, step in enumerate(steps):
-            step_type = step.get("type")
-            desc = step.get("description", "")
-            result = None
-            step_error = None
-            if step_type == "query":
-                result = self.df_agent.run(question)
-                step_error = result["error"]
-            elif step_type == "visualization":
-                result = {"msg": f"시각화({step.get('method', 'chart')}) 단계 dummy 실행"}
-            elif step_type == "tool_call":
-                tool_name = step.get("tool_name")
-                params = step.get("params", {})
-                # 실제 Tool 호출 및 DataFrame 적재
-                if tool_name == "fetch_kosis_data":
-                    try:
-                        api_key = os.environ.get("KOSIS_OPEN_API_KEY")
-                        orgId = params.get("orgId")
-                        tblId = params.get("tblId")
-                        prdSe = params.get("prdSe", "Y")
-                        startPrdDe = params.get("startPrdDe", "")
-                        endPrdDe = params.get("endPrdDe", "")
-                        itmId = params.get("itmId", "")
-                        objL1 = params.get("objL1", "")
-                        format_ = params.get("format", "json")
-                        if not (api_key and orgId and tblId):
-                            raise ValueError("필수 파라미터(orgId, tblId, api_key)가 누락됨")
-                        df = fetch_kosis_data(api_key, orgId, tblId, prdSe, startPrdDe, endPrdDe, itmId, objL1, format_)
-                        # DataFrame 저장 및 SQL 테이블 등록
-                        df_name = f"{tool_name}_{tblId}"
-                        self.df_agent.dataframes[df_name] = df
-                        table_name = self.df_agent.register_dataframe(df_name, df)
-                        result = {"msg": f"Tool({tool_name}) 호출 및 DataFrame 적재 완료", "df_shape": df.shape, "table_name": table_name}
-                    except Exception as e:
-                        result = {"error": f"KOSIS Tool 호출 실패: {e}", "params": params}
-                        step_error = str(e)
-                elif tool_name == "get_stat_list":
-                    try:
-                        api_key = os.environ.get("KOSIS_OPEN_API_KEY")
-                        vwCd = params.get("vwCd", "MT_ZTITLE")
-                        parentListId = params.get("parentListId", "")
-                        format_ = params.get("format", "json")
-                        if not api_key:
-                            raise ValueError("KOSIS_OPEN_API_KEY 환경변수가 누락됨")
-                        stat_list = get_stat_list(api_key, vwCd, parentListId, format_)
-                        result = {"msg": f"Tool({tool_name}) 호출 완료", "stat_count": len(stat_list) if isinstance(stat_list, list) else 1}
-                    except Exception as e:
-                        result = {"error": f"KOSIS 통계목록 조회 실패: {e}", "params": params}
-                        step_error = str(e)
-                else:
-                    result = {"msg": f"Tool({tool_name}) 호출 dummy", "params": params}
-            else:
-                result = {"msg": f"알 수 없는 step type: {step_type}"}
-                step_error = "step type 오류"
-            executed_steps.append(step)
+            execution_result = self.execute_step(step)
+            
             history.append({
                 "step": step_idx,
-                "type": step_type,
-                "description": desc,
-                "result": result,
-                "error": step_error
+                "type": execution_result["step_type"],
+                "description": execution_result["description"],
+                "result": execution_result["result"],
+                "error": execution_result["error"]
             })
-            if step_type == "query" and step_error:
-                error = step_error
+            
+            # 오류 시 재계획
+            if execution_result["error"] and step["type"] == "query":
+                error = execution_result["error"]
                 remaining_plan = steps[step_idx+1:]
-                for _ in range(max_reflection_steps):
-                    steps = self.reflect_and_replan(question, schema, history, steps, result, error)
-                    if not steps:
+                
+                for reflection_round in range(max_reflection_steps):
+                    new_steps = self.reflect_and_replan(question, schema, history, steps, execution_result["result"], error)
+                    if not new_steps:
                         break
-                    step = steps[0]
-                    step_type = step.get("type")
-                    desc = step.get("description", "")
-                    if step_type == "query":
-                        result = self.df_agent.run(question)
-                        step_error = result["error"]
-                    elif step_type == "visualization":
-                        result = {"msg": f"시각화({step.get('method', 'chart')}) 단계 dummy 실행"}
-                    elif step_type == "tool_call":
-                        tool_name = step.get("tool_name")
-                        params = step.get("params", {})
-                        if tool_name == "fetch_kosis_data":
-                            try:
-                                api_key = os.environ.get("KOSIS_OPEN_API_KEY")
-                                orgId = params.get("orgId")
-                                tblId = params.get("tblId")
-                                prdSe = params.get("prdSe", "Y")
-                                startPrdDe = params.get("startPrdDe", "")
-                                endPrdDe = params.get("endPrdDe", "")
-                                itmId = params.get("itmId", "")
-                                objL1 = params.get("objL1", "")
-                                format_ = params.get("format", "json")
-                                if not (api_key and orgId and tblId):
-                                    raise ValueError("필수 파라미터(orgId, tblId, api_key)가 누락됨")
-                                df = fetch_kosis_data(api_key, orgId, tblId, prdSe, startPrdDe, endPrdDe, itmId, objL1, format_)
-                                # DataFrame 저장 및 SQL 테이블 등록
-                                df_name = f"{tool_name}_{tblId}"
-                                self.df_agent.dataframes[df_name] = df
-                                table_name = self.df_agent.register_dataframe(df_name, df)
-                                result = {"msg": f"Tool({tool_name}) 호출 및 DataFrame 적재 완료", "df_shape": df.shape, "table_name": table_name}
-                            except Exception as e:
-                                result = {"error": f"KOSIS Tool 호출 실패: {e}", "params": params}
-                                step_error = str(e)
-                        elif tool_name == "get_stat_list":
-                            try:
-                                api_key = os.environ.get("KOSIS_OPEN_API_KEY")
-                                vwCd = params.get("vwCd", "MT_ZTITLE")
-                                parentListId = params.get("parentListId", "")
-                                format_ = params.get("format", "json")
-                                if not api_key:
-                                    raise ValueError("KOSIS_OPEN_API_KEY 환경변수가 누락됨")
-                                stat_list = get_stat_list(api_key, vwCd, parentListId, format_)
-                                result = {"msg": f"Tool({tool_name}) 호출 완료", "stat_count": len(stat_list) if isinstance(stat_list, list) else 1}
-                            except Exception as e:
-                                result = {"error": f"KOSIS 통계목록 조회 실패: {e}", "params": params}
-                                step_error = str(e)
-                        else:
-                            result = {"msg": f"Tool({tool_name}) 호출 dummy", "params": params}
-                    else:
-                        result = {"msg": f"알 수 없는 step type: {step_type}"}
-                        step_error = "step type 오류"
-                    executed_steps.append(step)
+                        
+                    # 첫 번째 새 단계 실행
+                    new_step = new_steps[0]
+                    new_execution = self.execute_step(new_step)
+                    
                     history.append({
                         "step": len(history),
-                        "type": step_type,
-                        "description": desc,
-                        "result": result,
-                        "error": step_error
+                        "type": new_execution["step_type"], 
+                        "description": new_execution["description"],
+                        "result": new_execution["result"],
+                        "error": new_execution["error"]
                     })
-                    if step_type == "query" and not step_error:
+                    
+                    # 성공하면 종료
+                    if not new_execution["error"]:
                         break
                 break
-        remaining_plan = steps[len(executed_steps):]
+        
+        remaining_plan = steps[len(history):] if len(history) < len(steps) else []
+        
         return {
             "history": history,
             "remaining_plan": remaining_plan,
