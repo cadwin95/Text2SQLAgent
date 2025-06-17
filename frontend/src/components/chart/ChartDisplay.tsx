@@ -7,7 +7,7 @@
 
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,

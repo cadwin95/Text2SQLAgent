@@ -41,7 +41,7 @@ const QueryResultTable: React.FC<QueryResultTableProps> = ({
   data,
   title,
   showQuery = true,
-  maxRows = 100,
+  // maxRows = 100, // 향후 페이지네이션용
   className = '',
 }) => {
   const [sortColumn, setSortColumn] = useState<string | null>(null);

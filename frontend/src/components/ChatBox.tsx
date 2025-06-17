@@ -37,7 +37,6 @@ const ChatBox: React.FC<ChatBoxProps> = ({
   disabled = false,
 }) => {
   const [inputValue, setInputValue] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

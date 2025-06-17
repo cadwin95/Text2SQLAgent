@@ -77,6 +77,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   /**
    * 데이터 테이블 렌더링
    */
+  // @ts-ignore - TODO: 향후 사용 예정
   const renderDataTable = (tableData: any) => {
     if (!tableData || !tableData.columns || !tableData.rows) return null;
 
@@ -215,13 +216,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       
       // 스트리밍 메시지에서 JSON 데이터 추출 시도
       try {
-        const tableMatch = message.content.match(/\[TABLE_DATA\]([\s\S]*?)\[\/TABLE_DATA\]/);
-        const chartMatch = message.content.match(/\[CHART_DATA\]([\s\S]*?)\[\/CHART_DATA\]/);
+        const content = message.content.replace(/\[TABLE_DATA\][\s\S]*?\[\/TABLE_DATA\]/, '').replace(/\[CHART_DATA\][\s\S]*?\[\/CHART_DATA\]/, '');
         
-        if (tableMatch) {
+        // 테이블 데이터 추출
+        const tableMatch = content.match(/```table\n([\s\S]*?)\n```/);
+        if (tableMatch && tableMatch[1]) {
           tableData = JSON.parse(tableMatch[1]);
         }
-        if (chartMatch) {
+
+        // 차트 데이터 추출
+        const chartMatch = content.match(/```chart\n([\s\S]*?)\n```/);
+        if (chartMatch && chartMatch[1]) {
           chartData = JSON.parse(chartMatch[1]);
         }
       } catch (e) {
@@ -347,7 +352,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const renderMetadata = () => {
     if (!message.metadata) return null;
 
-    const { queryType, dataSource, executionTime, isStreaming } = message.metadata;
+    const { queryType, dataSource, executionTime } = message.metadata;
 
     return (
       <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">

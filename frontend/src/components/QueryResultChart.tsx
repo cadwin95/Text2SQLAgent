@@ -154,18 +154,22 @@ const QueryResultChart: React.FC<QueryResultChartProps> = ({
   const chartData = React.useMemo(() => {
     return {
       ...data.data,
-      datasets: data.data.datasets.map((dataset, index) => ({
-        ...dataset,
-        // 파이/도넛 차트의 경우 다양한 색상 적용
-        backgroundColor: (chartType === 'pie' || chartType === 'doughnut') && !dataset.backgroundColor
-          ? [
-              '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-              '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#36A2EB'
-            ]
-          : dataset.backgroundColor,
-      })),
+      datasets: data.data.datasets.map((dataset) => {
+        const chartDataset: any = {
+          label: dataset.label,
+          data: dataset.data,
+          backgroundColor: dataset.backgroundColor || 'rgba(54, 162, 235, 0.2)',
+        };
+        
+        if (dataset.borderColor) chartDataset.borderColor = dataset.borderColor;
+        if (dataset.borderWidth) chartDataset.borderWidth = dataset.borderWidth;
+        if (dataset.tension !== undefined) chartDataset.tension = dataset.tension;
+        if (dataset.fill !== undefined) chartDataset.fill = dataset.fill;
+        
+        return chartDataset;
+      }),
     };
-  }, [data.data, chartType]);
+  }, [data.data]);
 
   if (!data || !data.data) {
     return (
@@ -264,8 +268,8 @@ const QueryResultChart: React.FC<QueryResultChartProps> = ({
               type={chartType}
               data={chartData}
               options={mergedOptions}
-              width={isFullscreen ? undefined : width}
-              height={isFullscreen ? undefined : height}
+              width={isFullscreen ? undefined : (width || 400)}
+              height={isFullscreen ? undefined : (height || 300)}
             />
           </div>
         </div>
