@@ -19,10 +19,14 @@ import {
   Tooltip,
   Legend,
   ArcElement,
+  LineController,
+  BarController,
+  PieController,
+  DoughnutController,
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 
-// Chart.js 컴포넌트 등록
+// Chart.js 컴포넌트 등록 (컨트롤러 포함)
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -32,7 +36,11 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  ArcElement
+  ArcElement,
+  LineController,
+  BarController,
+  PieController,
+  DoughnutController
 );
 
 interface ChartData {

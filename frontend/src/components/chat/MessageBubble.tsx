@@ -11,7 +11,7 @@
 import React, { useState } from 'react';
 import { MessageBubbleProps } from '@/types';
 import ChartDisplay from '../chart/ChartDisplay';
-import QueryResultTable from '../QueryResultTable';
+
 import QueryResultChart from '../QueryResultChart';
 
 /**
@@ -77,7 +77,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   /**
    * 데이터 테이블 렌더링
    */
-  // @ts-ignore - TODO: 향후 사용 예정
   const renderDataTable = (tableData: any) => {
     if (!tableData || !tableData.columns || !tableData.rows) return null;
 
@@ -287,12 +286,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           <div className={`mt-4 ${tableData && chartData ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : ''}`}>
             {tableData && (
               <div className="order-1">
-                <QueryResultTable
-                  data={tableData}
-                  title="쿼리 결과"
-                  showQuery={true}
-                  className="w-full"
-                />
+                {renderDataTable(tableData)}
               </div>
             )}
             {chartData && (
