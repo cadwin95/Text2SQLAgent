@@ -62,25 +62,49 @@ export const sendChatMessage = async (request: ChatRequest): Promise<ChatRespons
     const response = await apiClient.post('/v1/chat/completions', openAIRequest);
     
     // OpenAI 응답을 ChatResponse 형식으로 변환
-    const sqlQuery = response.data.choices[0]?.message?.content || "SELECT 1;";
+    const content = response.data.choices[0]?.message?.content || "분석 결과를 생성할 수 없습니다.";
+    
+    // 응답에서 차트 데이터나 테이블 데이터 추출
+    let chartData = null;
+    let tableData = null;
+    
+    // 테이블 데이터 파싱 (Markdown 테이블 형식)
+    const tableMatch = content.match(/```\n(.*?)\n```/s);
+    if (tableMatch) {
+      const tableText = tableMatch[1];
+      const lines = tableText.split('\n').filter(line => line.trim());
+      if (lines.length > 2) {
+        const headers = lines[0].split('|').map(h => h.trim()).filter(h => h);
+        const rows = lines.slice(2).map(line => 
+          line.split('|').map(cell => cell.trim()).filter(cell => cell)
+        );
+        
+        tableData = {
+          columns: headers,
+          rows: rows
+        };
+      }
+    }
     
     return {
       message: {
         id: `msg-${Date.now()}`,
-        content: `SQL 쿼리가 생성되었습니다:\n\`\`\`sql\n${sqlQuery}\n\`\`\``,
+        content: content,
         role: 'assistant',
         timestamp: new Date(),
         metadata: {
           queryType: 'text2sql',
-          dataSource: 'generated',
-          executionTime: Date.now() % 1000, // 임시 실행 시간
+          dataSource: 'kosis',
+          executionTime: Date.now() % 1000,
+          chartData: chartData,
+          tableData: tableData
         }
       },
       sessionId: request.sessionId || 'default',
       suggestions: [
-        "한국의 인구 통계를 보여주세요",
-        "서울시 부동산 가격 동향을 분석해주세요",
-        "최근 5년간 GDP 성장률을 비교해주세요"
+        "2023년 서울시 인구 통계를 보여주세요",
+        "최근 5년간 한국 GDP 성장률을 보여주세요",
+        "시도별 인구 분포를 분석해주세요"
       ]
     };
   } catch (error) {

@@ -426,12 +426,76 @@ npm run build
 npm start
 ```
 
+## 🚀 FastMCP 기반 새로운 API (권장)
+
+새로운 `mcp_api_v2.py`는 [FastMCP](https://github.com/jlowin/fastmcp)를 활용한 깔끔한 구조를 제공합니다:
+
+### ✨ 주요 특징
+- **🛠️ 도구(Tools)**: 검증된 KOSIS API 함수들만 제공
+- **📋 프롬프트(Prompts)**: LLM 사용 가이드 및 문제 해결
+- **📁 리소스(Resources)**: 스키마 정보 및 실제 예시
+- **🧹 깔끔한 구조**: DEPRECATED 함수 완전 제거
+
+### 🎯 핵심 도구들
+```python
+# 1. 통계자료 직접 조회 (추천)
+fetch_kosis_data(
+    orgId="101",           # 통계청
+    tblId="DT_1B040A3",   # 주민등록인구
+    startPrdDe="2020",    # 시작년도
+    endPrdDe="2024"       # 종료년도
+)
+
+# 2. 통계목록 탐색
+get_stat_list(vwCd="MT_ZTITLE", parentListId="")
+
+# 3. 통계설명 조회
+get_stat_explanation(statId="1962009")
+```
+
+### 🚀 실행 방법
+```bash
+# 새로운 FastMCP 서버 실행
+python backend/mcp_api_v2.py
+
+# 출력 예시:
+🚀 KOSIS API MCP Server (FastMCP 기반)
+📊 사용 가능한 도구: fetch_kosis_data, get_stat_list, get_stat_explanation
+📋 사용 가능한 프롬프트: kosis_usage_guide, kosis_troubleshooting
+📁 사용 가능한 리소스: population schema, recent-population example
+```
+
+### 💡 기존 API와의 차이점
+| 기능 | 기존 (mcp_api.py) | 새버전 (mcp_api_v2.py) |
+|-----|------------------|------------------------|
+| 구조 | 복잡한 하드코딩 | FastMCP 표준 구조 |
+| 함수 개수 | 10개+ (DEPRECATED 포함) | 3개 핵심 함수 |
+| 에러 처리 | 복잡한 fallback | 명확한 에러 메시지 |
+| 프롬프트 | 파일 내 주석 | 별도 프롬프트 도구 |
+| 리소스 | 없음 | 스키마/예시 제공 |
+
+### 🔧 마이그레이션 가이드
+기존 코드에서 새 API로 이전하는 방법:
+
+```python
+# 기존 코드 (비추천)
+search_and_fetch_kosis_data(api_key, "인구")  # DEPRECATED
+
+# 새 코드 (추천)
+fetch_kosis_data(
+    orgId="101", 
+    tblId="DT_1B040A3", 
+    startPrdDe="2020", 
+    endPrdDe="2024"
+)
+```
+
 ## 📊 프로젝트 현재 상태
 
 ### ✅ 완료된 기능
 - **Backend**: 95% 완료 (프로덕션 준비)
   - AgentChain 파이프라인 완전 구현
-  - KOSIS API 연동 완료
+  - KOSIS API 연동 완료 (FastMCP 기반)
   - 차트 데이터 생성 완료
   - 스트리밍 API 완료
 
