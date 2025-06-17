@@ -59,13 +59,17 @@ mcp = FastMCP("KOSIS API MCP")
 @mcp.tool()
 def search_and_fetch_kosis_data(api_key: str, keyword: str, prdSe: str = "Y", newEstPrdCnt: str = "5") -> pd.DataFrame:
     """
-    검색 기반 KOSIS 데이터 조회 (권장 방법)
-    - 공식 명세: 통합 검색 기반 스마트 조회
-    - 주요 파라미터: api_key, keyword (예: "인구", "GDP", "물가" 등), prdSe, newEstPrdCnt
-    - 실제 예시: search_and_fetch_kosis_data(api_key="...", keyword="인구")
-    - 반환: 검색으로 찾은 최적 통계자료 pandas DataFrame
-    - 장점: 수동 파라미터 설정 불필요, 검색 기반 자동 테이블 선택
+    ⚠️ DEPRECATED: 이 함수는 더 이상 권장되지 않습니다.
+    
+    검색 기반 KOSIS 데이터 조회 (복잡하고 불안정)
+    - 문제점: 4단계 복잡한 파이프라인, 각 단계별 실패 가능성 높음
+    - 대안: fetch_kosis_data(orgId="101", tblId="DT_1B040A3") 직접 사용 권장
+    - 실제 사용 예시: fetch_kosis_data(api_key, "101", "DT_1B040A3", prdSe="Y", startPrdDe="2020", endPrdDe="2024")
+    - 장점: 직접적이고 안정적인 데이터 조회
+    
+    이 함수는 호환성을 위해 유지되지만, 새로운 개발에서는 사용하지 마세요.
     """
+    print("⚠️ 경고: search_and_fetch_kosis_data는 DEPRECATED입니다. fetch_kosis_data를 직접 사용하세요.")
     return _search_and_fetch_kosis_data_impl(api_key, keyword, prdSe, newEstPrdCnt)
 
 @mcp.tool()

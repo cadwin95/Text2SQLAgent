@@ -25,18 +25,22 @@ from mcp_api import fetch_kosis_data, get_stat_list
 MCP_TOOL_SPECS = [
     {
         "tool_name": "fetch_kosis_data",
-        "description": "KOSIS 통계자료 조회",
+        "description": "KOSIS 통계자료 조회 (권장)",
         "params": ["orgId", "tblId", "prdSe", "startPrdDe", "endPrdDe", "itmId", "objL1", "format"],
         "examples": [
             {
                 "description": "행정구역별 인구수 조회",
                 "params": {"orgId": "101", "tblId": "DT_1B040A3", "prdSe": "Y", "startPrdDe": "2020", "endPrdDe": "2024"}
+            },
+            {
+                "description": "최근 5년 인구 통계",
+                "params": {"orgId": "101", "tblId": "DT_1B040A3", "prdSe": "Y", "newEstPrdCnt": "5"}
             }
         ]
     },
     {
         "tool_name": "get_stat_list",
-        "description": "KOSIS 통계목록 조회",
+        "description": "KOSIS 통계목록 조회 (메타데이터)",
         "params": ["vwCd", "parentListId", "format"]
     }
 ]
@@ -242,43 +246,38 @@ JSON만 반환하세요:
                         result = {"error": f"KOSIS Tool 호출 실패: {e}", "params": params}
                         step_error = str(e)
                         
+                # search_and_fetch_kosis_data는 DEPRECATED - fetch_kosis_data 사용 권장
                 elif tool_name == "search_and_fetch_kosis_data":
+                    print("⚠️ 경고: search_and_fetch_kosis_data는 DEPRECATED입니다. fetch_kosis_data를 사용하세요.")
+                    # 대신 fetch_kosis_data로 인구 데이터 조회
                     try:
-                        # search_and_fetch_kosis_data 호출
-                        from mcp_api import _search_and_fetch_kosis_data_impl
-                        
                         api_key = os.environ.get("KOSIS_OPEN_API_KEY")
-                        keyword = params.get("keyword", "인구")
-                        prdSe = params.get("prdSe", "Y")
-                        newEstPrdCnt = params.get("newEstPrdCnt", "5")
-                        
                         if not api_key:
-                            api_key = "test_key"  # 백업용
-                            
-                        print(f"[스마트 검색] 키워드: '{keyword}' 검색 시작...")
-                        df = _search_and_fetch_kosis_data_impl(api_key, keyword, prdSe, newEstPrdCnt)
+                            api_key = "test_key"
                         
-                        # DataFrame이 성공적으로 로드되었는지 확인
-                        if not df.empty:
-                            print(f"[스마트 검색 성공] {len(df)}행의 실제 데이터 로드됨")
-                            print(f"[데이터 컬럼] {list(df.columns)}")
-                            if len(df) > 0:
-                                print(f"[데이터 샘플] {df.head(2).to_dict('records')}")
+                        # 기본 인구 통계표로 조회
+                        df = fetch_kosis_data(
+                            api_key=api_key, 
+                            orgId="101", 
+                            tblId="DT_1B040A3", 
+                            prdSe="Y", 
+                            startPrdDe="2020", 
+                            endPrdDe="2024"
+                        )
                         
-                        # DataFrame 저장 및 SQL 테이블 등록
-                        df_name = f"{tool_name}_{keyword}"
+                        df_name = f"kosis_population_data"
                         self.df_agent.dataframes[df_name] = df
-                        # SQL 테이블로도 등록
                         table_name = self.df_agent.register_dataframe(df_name, df)
+                        
                         result = {
-                            "msg": f"Tool({tool_name}) 스마트 검색 및 DataFrame 적재 완료",
+                            "msg": f"Tool({tool_name}) DEPRECATED - fetch_kosis_data로 대체 실행됨",
                             "df_shape": df.shape,
                             "df_name": df_name,
                             "table_name": table_name,
-                            "keyword": keyword
+                            "note": "향후 fetch_kosis_data를 직접 사용하세요"
                         }
                     except Exception as e:
-                        result = {"error": f"스마트 검색 Tool 호출 실패: {e}", "params": params}
+                        result = {"error": f"대체 Tool 호출 실패: {e}", "params": params}
                         step_error = str(e)
                         
                 elif tool_name == "get_stat_list":
