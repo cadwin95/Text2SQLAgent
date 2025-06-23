@@ -53,16 +53,25 @@ export default function ConnectionManager({
   const handleSaveConnection = async (connection: DatabaseConnection) => {
     try {
       if (editingConnection) {
-        // 편집 모드: localStorage에서 업데이트
+        // 편집 모드: 백엔드와 localStorage 모두 업데이트
+        try {
+          // 백엔드에 업데이트 요청
+          await safelyCallDatabaseAPI.updateConnection(connection);
+          console.log('✅ 백엔드에 연결 정보 업데이트됨');
+        } catch (error) {
+          console.warn('⚠️ 백엔드 업데이트 실패, localStorage에만 저장됨:', error);
+        }
+        
+        // UI 상태 업데이트
         const updatedConnections = connections.map(c => 
           c.id === connection.id ? connection : c
         );
         setConnections(updatedConnections);
         
-        // localStorage에 즉시 저장
+        // localStorage에 저장
         try {
           localStorage.setItem('database-connections', JSON.stringify(updatedConnections));
-          console.log('연결 정보가 localStorage에 업데이트되었습니다.');
+          console.log('🔄 연결 정보가 localStorage에 업데이트되었습니다.');
         } catch (error) {
           console.error('localStorage 저장 실패:', error);
         }

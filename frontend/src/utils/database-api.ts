@@ -251,6 +251,26 @@ export const safelyCallDatabaseAPI = {
     return newConnection;
   },
 
+  // 연결 업데이트 (localStorage 우선, 백엔드는 백그라운드)
+  updateConnection: async (connection: DatabaseConnection): Promise<DatabaseConnection> => {
+    // localStorage에 즉시 업데이트
+    const connections = localStorageBackup.loadConnections();
+    const updatedConnections = connections.map(conn => 
+      conn.id === connection.id ? connection : conn
+    );
+    localStorageBackup.saveConnections(updatedConnections);
+
+    // 백엔드에 백그라운드로 업데이트 시도
+    try {
+      await databaseAPI.updateConnection(connection.id, connection);
+      console.log('✅ 백엔드에도 성공적으로 업데이트됨');
+    } catch (error) {
+      console.warn('⚠️ 백엔드 업데이트 실패, localStorage에만 저장됨:', error);
+    }
+
+    return connection;
+  },
+
   // 연결 활성화 (localStorage 우선, 백엔드는 백그라운드)
   activateConnection: async (connectionId: string): Promise<void> => {
     // localStorage에서 즉시 활성화
