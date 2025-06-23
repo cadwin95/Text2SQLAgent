@@ -73,6 +73,12 @@ class PostgreSQLHandler(BaseDatabaseHandler):
                 ssl_context.check_hostname = False
                 ssl_context.verify_mode = ssl.CERT_NONE
             
+            # PostgreSQL 연결 옵션 필터링 (schema 제외)
+            connection_options = {
+                k: v for k, v in self.config.options.items() 
+                if k not in ['schema']  # schema는 논리적 개념이므로 연결 파라미터에서 제외
+            }
+            
             # 연결 풀 생성
             self._pool = await asyncpg.create_pool(
                 dsn,
@@ -80,7 +86,7 @@ class PostgreSQLHandler(BaseDatabaseHandler):
                 min_size=1,
                 max_size=10,
                 command_timeout=60,
-                **self.config.options
+                **connection_options
             )
             
             # 연결 테스트
@@ -132,8 +138,14 @@ class PostgreSQLHandler(BaseDatabaseHandler):
                 ssl_context.check_hostname = False
                 ssl_context.verify_mode = ssl.CERT_NONE
             
+            # PostgreSQL 연결 옵션 필터링 (schema 제외)
+            connection_options = {
+                k: v for k, v in self.config.options.items() 
+                if k not in ['schema']  # schema는 논리적 개념이므로 연결 파라미터에서 제외
+            }
+            
             # 임시 연결로 테스트
-            conn = await asyncpg.connect(dsn, ssl=ssl_context, **self.config.options)
+            conn = await asyncpg.connect(dsn, ssl=ssl_context, **connection_options)
             
             version = await conn.fetchval("SELECT version()")
             connection_id = await conn.fetchval("SELECT pg_backend_pid()")
@@ -276,7 +288,7 @@ class PostgreSQLHandler(BaseDatabaseHandler):
     async def get_schema(self) -> SchemaInfo:
         """PostgreSQL 스키마 정보 조회"""
         try:
-            schema_name = self.config.options.get('schema', 'public')
+            schema_name = self.config.options.get('schema', 'anomaly')
             tables = await self.get_tables(schema_name)
             
             # 뷰 조회
