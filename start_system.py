@@ -1,251 +1,257 @@
 #!/usr/bin/env python3
 """
-🚀 통합 AI Assistant 시작 스크립트 v3.0
-========================================
-
-📋 시스템 구성:
-┌─────────────────────────────────────────────────────────────────┐
-│                      전체 시스템 실행                            │
-│                                                                 │
-│  1️⃣ 환경 검증                                                   │
-│     ├── Python 3.8+ 확인                                        │
-│     ├── Node.js 확인                                            │
-│     ├── OPENAI_API_KEY 확인                                      │
-│     └── KOSIS_OPEN_API_KEY 확인 (선택사항)                        │
-│                                                                 │
-│  2️⃣ 의존성 설치 (옵션)                                           │
-│     ├── Python packages (FastAPI, OpenAI, MCP)                  │
-│     └── Frontend packages (Next.js, React)                      │
-│                                                                 │
-│  3️⃣ 서비스 시작                                                  │
-│     ├── API 서버 (포트 8000)                                     │
-│     │   ├── OpenAI 클라이언트 초기화                             │
-│     │   ├── MCP 클라이언트 연결 시도                             │
-│     │   └── Fallback 시스템 준비                                │
-│     │                                                           │
-│     └── Frontend 서버 (포트 3000)                                │
-│         ├── Next.js 개발 서버                                    │
-│         ├── React 컴포넌트                                       │
-│         └── API 통신 설정                                        │
-│                                                                 │
-│  4️⃣ 상태 모니터링                                                │
-│     ├── 프로세스 상태 확인                                       │
-│     ├── API 서버 Health Check                                   │
-│     ├── MCP 연결 상태 확인                                       │
-│     └── 실시간 로그 출력                                         │
-└─────────────────────────────────────────────────────────────────┘
-
-🎯 주요 특징:
-- 완전 자동화된 시스템 시작
-- 견고한 오류 처리 및 복구
-- 실시간 상태 모니터링
-- 우아한 종료 처리 (Ctrl+C)
-
-🔧 사용법:
-1. 환경변수 설정 (.env 파일)
-2. python start_system.py 실행
-3. 웹브라우저에서 http://localhost:3000 접속
+Text2SQL Agent 시스템 시작 스크립트
+백엔드와 프론트엔드를 자동으로 시작합니다.
 """
 
 import os
 import sys
 import subprocess
+import platform
 import time
-import signal
+import shutil
 from pathlib import Path
 
-# 색상 코드
-GREEN = '\033[92m'
-BLUE = '\033[94m'
-YELLOW = '\033[93m'
-RED = '\033[91m'
-RESET = '\033[0m'
 
-class SystemLauncher:
-    def __init__(self):
-        self.processes = []
-        self.root_dir = Path(__file__).parent
-        
-    def print_banner(self):
-        print(f"""
-{BLUE}╔═══════════════════════════════════════════════════════════╗
-║         통합 AI Assistant System v3.0                      ║
-║     General Chat + Data Analysis with MCP                  ║
-╚═══════════════════════════════════════════════════════════╝{RESET}
+def print_banner():
+    """시작 배너 출력"""
+    print("=" * 50)
+    print("     Text2SQL Agent 시스템 시작")
+    print("=" * 50)
+    print()
 
-{GREEN}🤖 시스템 구성:{RESET}
-├── 🧠 OpenAI GPT (일반 대화)
-├── 📊 KOSIS MCP Server (데이터 분석)
-├── 🌐 통합 API 서버 (포트: 8000)
-└── 🎨 Frontend Next.js (포트: 3000)
 
-{YELLOW}📝 필수 환경변수 (.env 파일):{RESET}
-- OPENAI_API_KEY: OpenAI API 키
-- KOSIS_OPEN_API_KEY: KOSIS API 키
-""")
-        
-    def check_requirements(self):
-        """필수 요구사항 확인"""
-        print(f"{BLUE}📋 시스템 요구사항 확인 중...{RESET}")
-        
-        # Python 버전 확인
-        if sys.version_info < (3, 8):
-            print(f"{RED}❌ Python 3.8 이상이 필요합니다.{RESET}")
-            return False
-            
-        # Node.js 확인
-        try:
-            result = subprocess.run(['node', '--version'], capture_output=True, text=True)
-            node_version = result.stdout.strip()
-            print(f"{GREEN}✅ Node.js {node_version}{RESET}")
-        except:
-            print(f"{RED}❌ Node.js가 설치되지 않았습니다.{RESET}")
-            return False
-            
-        # 환경변수 확인
-        if not os.getenv('OPENAI_API_KEY'):
-            print(f"{RED}❌ OPENAI_API_KEY가 설정되지 않았습니다.{RESET}")
-            return False
-        else:
-            print(f"{GREEN}✅ OpenAI API 키 설정됨{RESET}")
-            
-        if not os.getenv('KOSIS_OPEN_API_KEY'):
-            print(f"{YELLOW}⚠️  KOSIS_OPEN_API_KEY가 설정되지 않았습니다. 데이터 분석 기능이 제한될 수 있습니다.{RESET}")
-        else:
-            print(f"{GREEN}✅ KOSIS API 키 설정됨{RESET}")
-            
-        return True
-        
-    def install_dependencies(self):
-        """의존성 설치"""
-        print(f"\n{BLUE}📦 의존성 설치 중...{RESET}")
-        
-        # Python 패키지 설치
-        print(f"{YELLOW}Installing Python packages...{RESET}")
-        requirements = [
-            "fastapi",
-            "uvicorn",
-            "openai",
-            "mcp",
-            "python-dotenv",
-            "pandas",
-            "requests"
-        ]
-        
-        for package in requirements:
-            subprocess.run([sys.executable, '-m', 'pip', 'install', package])
-        
-        # Frontend 패키지 설치
-        print(f"{YELLOW}Installing Frontend packages...{RESET}")
-        os.chdir(self.root_dir / 'frontend')
-        subprocess.run(['npm', 'install'])
-        os.chdir(self.root_dir)
-        
-    def start_api_server(self):
-        """통합 API 서버 시작"""
-        print(f"\n{GREEN}🚀 통합 API 서버 시작 중...{RESET}")
-        proc = subprocess.Popen(
-            [sys.executable, 'api_server.py'],
-            cwd=self.root_dir
-        )
-        self.processes.append(proc)
-        time.sleep(5)  # 서버 시작 대기
-        return True
-        
-    def start_frontend(self):
-        """Frontend 개발 서버 시작"""
-        print(f"\n{GREEN}🚀 Frontend 개발 서버 시작 중...{RESET}")
-        proc = subprocess.Popen(
-            ['npm', 'run', 'dev'],
-            cwd=self.root_dir / 'frontend',
-            shell=True
-        )
-        self.processes.append(proc)
-        return True
-        
-    def test_api_connection(self):
-        """API 서버 연결 테스트"""
-        import requests
-        try:
-            response = requests.get("http://localhost:8000/health", timeout=5)
-            if response.status_code == 200:
-                print(f"{GREEN}✅ API 서버 정상 작동 중{RESET}")
-                health_data = response.json()
-                if health_data.get('openai'):
-                    print(f"{GREEN}  - OpenAI 연결 상태: ✅{RESET}")
-                if health_data.get('mcp_servers'):
-                    print(f"{GREEN}  - MCP 서버 수: {len(health_data['mcp_servers'])}{RESET}")
-                return True
-        except:
-            pass
+def check_python():
+    """Python 버전 확인"""
+    print("Python 버전 확인 중...")
+    version = sys.version_info
+    print(f"Python {version.major}.{version.minor}.{version.micro}")
+    
+    if version.major < 3 or (version.major == 3 and version.minor < 8):
+        print("오류: Python 3.8 이상이 필요합니다.")
         return False
+    
+    print("✓ Python 버전 확인 완료")
+    print()
+    return True
+
+
+def check_node():
+    """Node.js 버전 확인"""
+    print("Node.js 버전 확인 중...")
+    try:
+        result = subprocess.run(["node", "--version"], 
+                              capture_output=True, text=True, check=True)
+        version = result.stdout.strip()
+        print(f"Node.js {version}")
         
-    def monitor_processes(self):
-        """프로세스 모니터링"""
-        print(f"\n{GREEN}✅ 모든 서비스가 시작되었습니다!{RESET}")
-        print(f"\n{BLUE}📌 접속 정보:{RESET}")
-        print(f"- Frontend: http://localhost:3000")
-        print(f"- API 서버: http://localhost:8000")
-        print(f"- API 문서: http://localhost:8000/docs")
-        print(f"- Health Check: http://localhost:8000/health")
-        print(f"\n{YELLOW}💡 사용 팁:{RESET}")
-        print(f"- 일반 대화: '안녕하세요', '오늘 날씨 어때?', '지금 몇 시야?'")
-        print(f"- 데이터 분석: '인구 통계 보여줘', 'GDP 추이 분석해줘'")
-        print(f"\n{YELLOW}종료하려면 Ctrl+C를 누르세요.{RESET}")
-        
-        try:
-            while True:
-                # 프로세스 상태 확인
-                for proc in self.processes:
-                    if proc.poll() is not None:
-                        print(f"{RED}⚠️  프로세스가 종료되었습니다: PID {proc.pid}{RESET}")
-                time.sleep(5)
-        except KeyboardInterrupt:
-            self.shutdown()
+        # 버전 번호 추출 (v18.0.0 -> 18)
+        major_version = int(version.split('.')[0][1:])
+        if major_version < 18:
+            print("경고: Node.js 18 이상을 권장합니다.")
             
-    def shutdown(self):
-        """시스템 종료"""
-        print(f"\n{YELLOW}🛑 시스템을 종료합니다...{RESET}")
-        for proc in self.processes:
+        print("✓ Node.js 버전 확인 완료")
+        print()
+        return True
+        
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("오류: Node.js가 설치되지 않았거나 PATH에 등록되지 않았습니다.")
+        print("Node.js 18 이상을 설치하고 PATH에 등록해주세요.")
+        return False
+
+
+def setup_virtual_environment():
+    """가상환경 설정"""
+    print("백엔드 가상환경 확인 중...")
+    
+    # .venv 우선 확인, 없으면 venv 확인
+    venv_path = Path(".venv")
+    if not venv_path.exists():
+        venv_path = Path("venv")
+        if not venv_path.exists():
+            print("가상환경이 없습니다. .venv로 생성 중...")
             try:
-                proc.terminate()
-                proc.wait(timeout=5)
-            except:
-                proc.kill()
-        print(f"{GREEN}✅ 종료 완료{RESET}")
-        
-    def run(self):
-        """시스템 실행"""
-        self.print_banner()
-        
-        if not self.check_requirements():
-            sys.exit(1)
-            
-        # 의존성 설치 옵션
-        install = input(f"\n{YELLOW}의존성을 설치하시겠습니까? (y/N): {RESET}")
-        if install.lower() == 'y':
-            self.install_dependencies()
-            
-        # 서비스 시작
-        if not self.start_api_server():
-            print(f"{RED}API 서버 시작 실패{RESET}")
-            sys.exit(1)
-            
-        # API 서버 연결 테스트
-        print(f"\n{BLUE}🔍 API 서버 연결 테스트 중...{RESET}")
-        time.sleep(3)
-        if self.test_api_connection():
-            print(f"{GREEN}✅ API 서버 준비 완료!{RESET}")
+                subprocess.run([sys.executable, "-m", "venv", ".venv"], check=True)
+                venv_path = Path(".venv")
+                print("✓ 가상환경 생성 완료")
+            except subprocess.CalledProcessError:
+                print("오류: 가상환경 생성에 실패했습니다.")
+                return False
         else:
-            print(f"{YELLOW}⚠️  API 서버 응답이 느립니다. 계속 진행합니다.{RESET}")
-            
-        if not self.start_frontend():
-            print(f"{RED}Frontend 시작 실패{RESET}")
-            sys.exit(1)
-            
-        # 모니터링
-        self.monitor_processes()
+            print("✓ 기존 venv 가상환경 확인 완료")
+    else:
+        print("✓ .venv 가상환경 확인 완료")
+    
+    # 가상환경 활성화 스크립트 경로
+    system = platform.system()
+    if system == "Windows":
+        python_path = venv_path / "Scripts" / "python.exe"
+        pip_path = venv_path / "Scripts" / "pip.exe"
+    else:
+        python_path = venv_path / "bin" / "python"
+        pip_path = venv_path / "bin" / "pip"
+    
+    # 의존성 설치
+    print("백엔드 의존성 설치 중...")
+    try:
+        subprocess.run([str(pip_path), "install", "-r", "requirements.txt"], 
+                      check=True)
+        print("✓ 백엔드 의존성 설치 완료")
+        print()
+        return python_path
+    except subprocess.CalledProcessError:
+        print("오류: 백엔드 의존성 설치에 실패했습니다.")
+        return False
+
+
+def setup_frontend():
+    """프론트엔드 의존성 설정"""
+    print("프론트엔드 의존성 확인 중...")
+    
+    frontend_path = Path("frontend")
+    if not frontend_path.exists():
+        print("오류: frontend 디렉토리가 없습니다.")
+        return False
+    
+    node_modules_path = frontend_path / "node_modules"
+    if not node_modules_path.exists():
+        print("node_modules가 없습니다. 의존성 설치 중...")
+        try:
+            subprocess.run(["npm", "install"], cwd=frontend_path, check=True)
+            print("✓ 프론트엔드 의존성 설치 완료")
+        except subprocess.CalledProcessError:
+            print("오류: 프론트엔드 의존성 설치에 실패했습니다.")
+            return False
+    else:
+        print("✓ 프론트엔드 의존성 확인 완료")
+    
+    print()
+    return True
+
+
+def setup_environment():
+    """환경 변수 파일 설정"""
+    env_path = Path(".env")
+    env_example_path = Path("env.example")
+    
+    if not env_path.exists():
+        if env_example_path.exists():
+            print(".env 파일이 없습니다. env.example을 복사합니다...")
+            shutil.copy(env_example_path, env_path)
+            print("✓ .env 파일 생성 완료")
+        else:
+            print("경고: .env 파일과 env.example 파일이 모두 없습니다.")
+            print("필요한 환경 변수를 설정해주세요.")
+    else:
+        print("✓ .env 파일 확인 완료")
+    
+    print()
+
+
+def start_backend(python_path):
+    """백엔드 서버 시작"""
+    print("백엔드 서버 시작 중...")
+    
+    system = platform.system()
+    if system == "Windows":
+        # Windows에서 새 터미널 창으로 실행
+        cmd = f'start "백엔드 서버" cmd /k "{python_path} -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"'
+        subprocess.Popen(cmd, shell=True)
+    else:
+        # Linux/Mac에서 새 터미널 창으로 실행
+        cmd = [str(python_path), "-m", "uvicorn", "backend.main:app", 
+               "--host", "0.0.0.0", "--port", "8000", "--reload"]
+        subprocess.Popen(cmd)
+    
+    print("✓ 백엔드 서버 시작됨 (새 터미널에서)")
+
+
+def start_frontend():
+    """프론트엔드 서버 시작"""
+    print("프론트엔드 서버 시작 중...")
+    
+    system = platform.system()
+    if system == "Windows":
+        # Windows에서 새 터미널 창으로 실행
+        cmd = 'start "프론트엔드 서버" cmd /k "cd frontend && npm run dev"'
+        subprocess.Popen(cmd, shell=True)
+    else:
+        # Linux/Mac에서 새 터미널 창으로 실행
+        subprocess.Popen(["npm", "run", "dev"], cwd="frontend")
+    
+    print("✓ 프론트엔드 서버 시작됨 (새 터미널에서)")
+
+
+def print_completion_info():
+    """완료 정보 출력"""
+    print()
+    print("=" * 50)
+    print("     시스템 시작 완료!")
+    print("=" * 50)
+    print()
+    print("🌐 서비스 URL:")
+    print("   백엔드 서버: http://localhost:8000")
+    print("   프론트엔드:  http://localhost:3000")
+    print()
+    print("📖 API 문서:")
+    print("   Swagger UI:  http://localhost:8000/docs")
+    print("   헬스 체크:   http://localhost:8000/health")
+    print()
+    print("🛑 종료 방법:")
+    print("   각 터미널에서 Ctrl+C를 누르세요.")
+    print()
+
+
+def main():
+    """메인 함수"""
+    print_banner()
+    
+    # 현재 디렉토리 확인
+    print(f"현재 디렉토리: {os.getcwd()}")
+    print()
+    
+    # 전제 조건 확인
+    if not check_python():
+        sys.exit(1)
+    
+    if not check_node():
+        sys.exit(1)
+    
+    # 백엔드 설정
+    python_path = setup_virtual_environment()
+    if not python_path:
+        sys.exit(1)
+    
+    # 프론트엔드 설정
+    if not setup_frontend():
+        sys.exit(1)
+    
+    # 환경 변수 설정
+    setup_environment()
+    
+    print("=" * 50)
+    print("     서버 시작 중...")
+    print("=" * 50)
+    print()
+    
+    # 서버 시작
+    start_backend(python_path)
+    
+    # 백엔드 초기화 대기
+    print("백엔드 서버 초기화 대기 중...")
+    time.sleep(5)
+    
+    start_frontend()
+    
+    # 완료 정보 출력
+    print_completion_info()
+    
+    # 사용자 입력 대기
+    try:
+        input("계속하려면 Enter를 누르세요...")
+    except KeyboardInterrupt:
+        print("\n프로그램을 종료합니다.")
+
 
 if __name__ == "__main__":
-    launcher = SystemLauncher()
-    launcher.run() 
+    main() 

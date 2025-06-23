@@ -316,4 +316,52 @@
   .shadow-xl {
     box-shadow: none !important;
   }
+}
+
+/* Resizable Panel Styles */
+[data-panel-resize-handle-enabled] {
+  position: relative;
+}
+
+[data-panel-resize-handle-enabled]:hover::after {
+  content: '';
+  position: absolute;
+  background-color: #3b82f6;
+  opacity: 0.3;
+  transition: opacity 0.2s;
+}
+
+[data-panel-resize-handle-enabled][data-panel-resize-handle-direction="horizontal"]:hover::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+}
+
+[data-panel-resize-handle-enabled][data-panel-resize-handle-direction="vertical"]:hover::after {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #374151;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #6b7280;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 } 

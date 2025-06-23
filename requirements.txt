@@ -1,6 +1,48 @@
-fastapi
-uvicorn
-pydantic
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+python-multipart
+httpx
+websockets
+aiohttp>=3.9.1
+cryptography>=41.0.0
+
+# MindsDB 스타일 다중 데이터베이스 지원
+# MySQL 지원
+aiomysql>=0.2.0
+pymysql>=1.1.0
+
+# PostgreSQL 지원  
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.0
+
+# MongoDB 지원
+motor>=3.3.0
+pymongo>=4.6.0
+
+# SQLite 지원 (Python 내장)
+aiosqlite>=0.19.0
+
+# Redis 지원 (선택적)
+redis>=5.0.0
+aioredis>=2.0.0
+
+# Oracle 지원 (선택적)
+# cx-Oracle>=8.3.0  # Oracle 클라이언트 필요
+# oracledb>=1.4.0
+
+# SQL Server 지원 (선택적)  
+# pyodbc>=4.0.39  # ODBC 드라이버 필요
+# aioodbc>=0.4.0
+
+# 로깅 및 유틸리티
+python-dotenv>=1.0.0
+structlog>=23.2.0
+
+# 테스팅
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
 langchain
 openai
 pandas

@@ -6,33 +6,35 @@
 
 'use client';
 
-import React from 'react';
-import ChatContainer from '@/components/chat/ChatContainer';
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 /**
- * 메인 페이지 컴포넌트
+ * 메인 페이지 - IDE로 리디렉션
  * 
- * 주요 기능:
- * 1. ChatContainer를 통한 실시간 채팅
- * 2. 백엔드 API와 Socket.io 연동
- * 3. 공공데이터 분석 요청 처리
+ * 통합된 SQL IDE 환경으로 바로 이동
  */
 export default function HomePage() {
-  const handleMessageSend = (message: string) => {
-    console.log('메시지 전송:', message);
-  };
+  const router = useRouter();
 
-  const handleSessionChange = (sessionId: string) => {
-    console.log('세션 변경:', sessionId);
-  };
+  useEffect(() => {
+    // IDE 페이지로 리디렉션
+    router.push('/ide');
+  }, [router]);
 
+  // 로딩 화면 표시
   return (
-    <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
-      {/* 메인 채팅 컨테이너 */}
-      <ChatContainer
-        onMessageSend={handleMessageSend}
-        onSessionChange={handleSessionChange}
-      />
+    <div className="h-screen flex items-center justify-center bg-gray-900 text-white">
+      <div className="text-center">
+        <div className="text-6xl mb-4">🗃️</div>
+        <h1 className="text-2xl font-bold mb-2">SQL IDE</h1>
+        <p className="text-gray-400 mb-4">통합 데이터베이스 개발 환경으로 이동 중...</p>
+        <div className="flex items-center justify-center space-x-1">
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+        </div>
+      </div>
     </div>
   );
 } 

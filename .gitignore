@@ -166,6 +166,11 @@ datasets/
 !sample_data/
 !test_data/
 
+# Database connection storage (contains encrypted API keys)
+data/connections.json
+data/encryption.key
+data/backups/
+
 # Weights & Biases
 wandb/
 

@@ -67,9 +67,9 @@ export const sendChatMessage = async (request: ChatRequest): Promise<ChatRespons
   try {
     const questionType = analyzeQuestionType(request.message);
     
-    // OpenAI 호환 요청 형식
+    // OpenAI 호환 요청 형식 (환경변수에서 모델 설정)
     const openAIRequest = {
-      model: "gpt-3.5-turbo",
+      model: process.env.NEXT_PUBLIC_OPENAI_MODEL || "gpt-3.5-turbo",
       messages: [
         {
           role: "user",
@@ -83,7 +83,13 @@ export const sendChatMessage = async (request: ChatRequest): Promise<ChatRespons
 
     console.log(`🧠 질문 유형: ${questionType === 'general' ? '일반 대화' : '데이터 분석'}`);
 
-    const response = await apiClient.post('/v1/chat/completions', openAIRequest);
+    // 세션 ID가 있으면 헤더에 추가
+    const headers: any = {};
+    if (request.sessionId) {
+      headers['X-Session-ID'] = request.sessionId;
+    }
+
+    const response = await apiClient.post('/v1/chat/completions', openAIRequest, { headers });
     
     // OpenAI 호환 응답 파싱
     const content = response.data.choices[0]?.message?.content || "응답을 생성할 수 없습니다.";
@@ -150,7 +156,7 @@ export const sendChatMessage = async (request: ChatRequest): Promise<ChatRespons
           tableData: tableData
         }
       },
-      sessionId: request.sessionId || 'default',
+      sessionId: response.data.session_id || request.sessionId || 'default',
       suggestions: questionType === 'data_analysis' ? [
         "한국의 최근 인구 통계를 보여주세요",
         "GDP 성장률 추이를 분석해주세요",
@@ -191,7 +197,7 @@ export const sendChatMessageStream = async (
     
     // OpenAI 호환 스트리밍 요청
     const openAIRequest = {
-      model: "gpt-3.5-turbo",
+      model: process.env.NEXT_PUBLIC_OPENAI_MODEL || "gpt-3.5-turbo",
       messages: [
         {
           role: "user",
