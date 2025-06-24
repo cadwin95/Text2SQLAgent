@@ -130,14 +130,14 @@ const QueryEditor = forwardRef<QueryEditorRef, QueryEditorProps>(
     }
 
     return (
-      <div className="flex-1 flex flex-col">
-        {/* Tab Bar */}
-        <div className="flex items-center bg-gray-800 border-b border-gray-700">
+      <div className="h-full flex flex-col">
+        {/* Tab Bar - 높이 최소화 */}
+        <div className="flex items-center bg-gray-800 border-b border-gray-700 h-10 flex-shrink-0">
           <div className="flex-1 flex items-center overflow-x-auto">
             {tabs.map(tab => (
               <div
                 key={tab.id}
-                className={`flex items-center px-4 py-2 border-r border-gray-700 cursor-pointer min-w-0 ${
+                className={`flex items-center px-3 py-1.5 border-r border-gray-700 cursor-pointer min-w-0 text-sm ${
                   activeTab === tab.id 
                     ? 'bg-gray-900 text-white' 
                     : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
@@ -149,7 +149,7 @@ const QueryEditor = forwardRef<QueryEditorRef, QueryEditorProps>(
                 </span>
                 {tabs.length > 1 && (
                   <button
-                    className="text-gray-400 hover:text-white ml-1"
+                    className="text-gray-400 hover:text-white ml-1 text-lg leading-none"
                     onClick={(e) => handleCloseTab(tab.id, e)}
                   >
                     ×
@@ -160,7 +160,7 @@ const QueryEditor = forwardRef<QueryEditorRef, QueryEditorProps>(
           </div>
           
           <button
-            className="px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-700"
+            className="px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-700 text-sm"
             onClick={handleNewTab}
             title="New Tab"
           >
@@ -172,7 +172,7 @@ const QueryEditor = forwardRef<QueryEditorRef, QueryEditorProps>(
         <div className="flex items-center justify-between bg-gray-850 px-4 py-2 border-b border-gray-700">
           <div className="flex items-center space-x-2">
             <button
-              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium"
+              className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium"
               onClick={handleExecuteQuery}
               title="Execute Query (F5)"
             >
@@ -180,17 +180,17 @@ const QueryEditor = forwardRef<QueryEditorRef, QueryEditorProps>(
             </button>
             
             <button
-              className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm"
+              className="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs"
               onClick={formatSQL}
               title="Format SQL (Ctrl+Shift+F)"
             >
               Format
             </button>
 
-            <div className="w-px h-4 bg-gray-600 mx-2" />
+            <div className="w-px h-3 bg-gray-600 mx-1" />
 
             <button
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs"
               onClick={() => insertQueryAtCursor('SELECT * FROM ')}
               title="Insert SELECT"
             >
@@ -198,7 +198,7 @@ const QueryEditor = forwardRef<QueryEditorRef, QueryEditorProps>(
             </button>
 
             <button
-              className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm"
+              className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs"
               onClick={() => insertQueryAtCursor('INSERT INTO table_name (column1, column2) VALUES (?, ?);')}
               title="Insert INSERT"
             >
@@ -207,15 +207,15 @@ const QueryEditor = forwardRef<QueryEditorRef, QueryEditorProps>(
           </div>
           
           <div className="text-xs text-gray-400">
-            SQL Editor • Line {activeTabData.content.split('\n').length}
+            Lines: {activeTabData.content.split('\n').length}
           </div>
         </div>
 
-        {/* Code Editor */}
-        <div className="flex-1 relative">
+        {/* Code Editor - 최대한 많은 공간 차지 */}
+        <div className="flex-1 relative min-h-0">
           <textarea
             ref={textareaRef}
-            className="w-full h-full p-4 bg-gray-900 text-green-400 font-mono text-sm resize-none focus:outline-none"
+            className="w-full h-full p-3 bg-gray-900 text-green-400 font-mono text-sm resize-none focus:outline-none"
             value={activeTabData.content}
             onChange={(e) => handleContentChange(e.target.value)}
             placeholder="-- SQL 쿼리를 작성하세요..."
@@ -223,7 +223,7 @@ const QueryEditor = forwardRef<QueryEditorRef, QueryEditorProps>(
               fontFamily: 'Consolas, "Courier New", monospace',
               lineHeight: '1.5',
               fontSize: '14px',
-              paddingLeft: '4rem'
+              paddingLeft: '3.5rem'
             }}
             onKeyDown={(e) => {
               // F5로 실행
@@ -255,7 +255,7 @@ const QueryEditor = forwardRef<QueryEditorRef, QueryEditorProps>(
           />
           
           {/* Line Numbers */}
-          <div className="absolute left-0 top-0 w-12 h-full bg-gray-800 border-r border-gray-700 text-gray-500 text-xs font-mono pt-4 pl-2 pointer-events-none">
+          <div className="absolute left-0 top-0 w-12 h-full bg-gray-800 border-r border-gray-700 text-gray-500 text-xs font-mono pt-3 pl-2 pointer-events-none">
             {activeTabData.content.split('\n').map((_, index) => (
               <div key={index} style={{ lineHeight: '1.5', fontSize: '14px' }}>
                 {index + 1}
@@ -264,13 +264,13 @@ const QueryEditor = forwardRef<QueryEditorRef, QueryEditorProps>(
           </div>
         </div>
 
-        {/* Status Bar */}
-        <div className="h-6 bg-gray-800 border-t border-gray-700 flex items-center justify-between px-4 text-xs text-gray-400">
+        {/* Status Bar - 높이 최소화 */}
+        <div className="h-5 bg-gray-800 border-t border-gray-700 flex items-center justify-between px-3 text-xs text-gray-400 flex-shrink-0">
           <div>
-            Characters: {activeTabData.content.length} | Lines: {activeTabData.content.split('\n').length}
+            Chars: {activeTabData.content.length} | Lines: {activeTabData.content.split('\n').length}
           </div>
           <div>
-            SQL • UTF-8
+            SQL
           </div>
         </div>
       </div>

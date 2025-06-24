@@ -285,48 +285,80 @@ class PostgreSQLHandler(BaseDatabaseHandler):
         except Exception as e:
             raise SchemaError(f"Failed to get PostgreSQL tables: {e}")
     
-    async def get_schema(self) -> SchemaInfo:
-        """PostgreSQL 스키마 정보 조회"""
+    async def get_all_schemas(self) -> List[str]:
+        """PostgreSQL 모든 스키마 목록 조회"""
         try:
-            schema_name = self.config.options.get('schema', 'anomaly')
-            tables = await self.get_tables(schema_name)
-            
-            # 뷰 조회
-            views_query = """
-            SELECT table_name as name, table_schema as schema_name
-            FROM information_schema.views 
-            WHERE table_schema = $1
+            query = """
+            SELECT schema_name 
+            FROM information_schema.schemata 
+            WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
+            ORDER BY schema_name
             """
-            result = await self.execute_query(views_query, {"schema": schema_name})
-            views = []
+            result = await self.execute_query(query)
             if result.success:
-                for row in result.data:
-                    view_info = TableInfo(
-                        name=row['name'],
-                        schema=row['schema_name'],
-                        type='view'
-                    )
-                    views.append(view_info)
+                return [row['schema_name'] for row in result.data]
+            return []
+        except Exception as e:
+            logger.warning(f"Failed to get schemas: {e}")
+            return []
+
+    async def get_schema(self) -> SchemaInfo:
+        """PostgreSQL 스키마 정보 조회 - 모든 스키마 또는 지정 스키마"""
+        try:
+            # 모든 스키마 조회
+            all_schemas = await self.get_all_schemas()
+            default_schema = self.config.options.get('schema', 'public')
             
-            # 프로시저/함수 조회
-            procedures_query = """
-            SELECT routine_name as name, routine_type as type
-            FROM information_schema.routines 
-            WHERE routine_schema = $1
-            """
-            result = await self.execute_query(procedures_query, {"schema": schema_name})
-            procedures = []
-            if result.success:
-                procedures = [
-                    {"name": row['name'], "type": row['type']} 
-                    for row in result.data
-                ]
+            all_tables = []
+            all_views = []
+            all_procedures = []
+            
+            # 각 스키마별로 테이블, 뷰, 프로시저 조회
+            for schema_name in all_schemas:
+                try:
+                    # 테이블 조회
+                    tables = await self.get_tables(schema_name)
+                    all_tables.extend([t for t in tables if t.type == 'base_table'])
+                    
+                    # 뷰 조회
+                    views_query = """
+                    SELECT table_name as name, table_schema as schema_name
+                    FROM information_schema.views 
+                    WHERE table_schema = $1
+                    """
+                    result = await self.execute_query(views_query, {"schema": schema_name})
+                    if result.success:
+                        for row in result.data:
+                            view_info = TableInfo(
+                                name=row['name'],
+                                schema=row['schema_name'],
+                                type='view'
+                            )
+                            all_views.append(view_info)
+                    
+                    # 프로시저/함수 조회
+                    procedures_query = """
+                    SELECT routine_name as name, routine_type as type, routine_schema as schema_name
+                    FROM information_schema.routines 
+                    WHERE routine_schema = $1
+                    """
+                    result = await self.execute_query(procedures_query, {"schema": schema_name})
+                    if result.success:
+                        procedures = [
+                            {"name": row['name'], "type": row['type'], "schema": row['schema_name']} 
+                            for row in result.data
+                        ]
+                        all_procedures.extend(procedures)
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to get objects from schema {schema_name}: {e}")
+                    continue
             
             return SchemaInfo(
-                name=schema_name,
-                tables=[t for t in tables if t.type == 'base_table'],
-                views=views,
-                procedures=procedures
+                name=f"전체 ({len(all_schemas)} 스키마)",
+                tables=all_tables,
+                views=all_views,
+                procedures=all_procedures
             )
             
         except Exception as e:

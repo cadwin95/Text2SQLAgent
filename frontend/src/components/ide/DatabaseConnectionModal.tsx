@@ -19,7 +19,7 @@ export default function DatabaseConnectionModal({
   editConnection 
 }: DatabaseConnectionModalProps) {
   const [selectedType, setSelectedType] = useState<DatabaseType>('mysql');
-  const [connectionData, setConnectionData] = useState<Partial<DatabaseConnection>>({});
+  const [connectionData, setConnectionData] = useState<Partial<DatabaseConnection> & Record<string, any>>({});
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -29,7 +29,14 @@ export default function DatabaseConnectionModal({
     if (isOpen) {
       if (editConnection) {
         setSelectedType(editConnection.type);
-        setConnectionData(editConnection);
+        // 기존 연결 정보 로드 및 options에서 필드들 추출
+        const extractedData: any = { ...editConnection };
+        if (editConnection.options) {
+          Object.keys(editConnection.options).forEach(key => {
+            extractedData[key] = editConnection.options![key];
+          });
+        }
+        setConnectionData(extractedData);
       } else {
         resetForm();
       }
@@ -65,13 +72,23 @@ export default function DatabaseConnectionModal({
   };
 
   const handleFieldChange = (fieldName: string, value: any) => {
-    setConnectionData(prev => ({
-      ...prev,
-      [fieldName]: value,
-      updatedAt: new Date()
-    }));
+    setConnectionData(prev => {
+      const newData = {
+        ...prev,
+        [fieldName]: value,
+        updatedAt: new Date()
+      };
+      
+      if (fieldName === 'schema') {
+        newData.options = {
+          ...prev.options,
+          schema: value
+        };
+      }
+      
+      return newData;
+    });
     
-    // 에러 클리어
     if (errors[fieldName]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -85,12 +102,10 @@ export default function DatabaseConnectionModal({
     const config = DATABASE_CONFIGS[selectedType];
     const newErrors: Record<string, string> = {};
 
-    // 연결 이름 검증
     if (!connectionData.name?.trim()) {
       newErrors.name = '연결 이름은 필수입니다';
     }
 
-    // 필드별 검증
     config.fields.forEach(field => {
       const value = (connectionData as any)[field.name];
       
@@ -150,6 +165,11 @@ export default function DatabaseConnectionModal({
   const handleSave = () => {
     if (!validateForm()) return;
     
+    const finalOptions = {
+      ...connectionData.options,
+      ...((connectionData as any).schema && { schema: (connectionData as any).schema })
+    };
+    
     const finalConnection: DatabaseConnection = {
       id: connectionData.id || crypto.randomUUID(),
       name: connectionData.name!,
@@ -157,7 +177,8 @@ export default function DatabaseConnectionModal({
       createdAt: connectionData.createdAt || new Date(),
       updatedAt: new Date(),
       isActive: false,
-      ...connectionData
+      ...connectionData,
+      options: finalOptions
     } as DatabaseConnection;
 
     onSave(finalConnection);
@@ -280,7 +301,6 @@ export default function DatabaseConnectionModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-gray-800 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
           <h2 className="text-xl font-semibold text-white">
             {editConnection ? '데이터베이스 연결 수정' : '새 데이터베이스 연결'}
@@ -294,7 +314,6 @@ export default function DatabaseConnectionModal({
         </div>
 
         <div className="flex h-[600px]">
-          {/* Database Type Selector */}
           <div className="w-64 bg-gray-850 border-r border-gray-700 overflow-y-auto">
             <div className="p-4">
               <h3 className="text-sm font-medium text-gray-300 mb-3">데이터베이스 타입</h3>
@@ -323,9 +342,7 @@ export default function DatabaseConnectionModal({
             </div>
           </div>
 
-          {/* Configuration Form */}
           <div className="flex-1 flex flex-col">
-            {/* Tabs */}
             <div className="flex border-b border-gray-700">
               <button
                 className={`px-4 py-3 text-sm font-medium transition-colors ${
@@ -349,11 +366,9 @@ export default function DatabaseConnectionModal({
               </button>
             </div>
 
-            {/* Form Content */}
             <div className="flex-1 overflow-y-auto p-6">
               {activeTab === 'basic' && (
                 <div>
-                  {/* Connection Name */}
                   <div className="mb-6">
                     <label className="block text-sm font-medium text-gray-300 mb-1">
                       연결 이름 <span className="text-red-400">*</span>
@@ -372,12 +387,10 @@ export default function DatabaseConnectionModal({
                     )}
                   </div>
 
-                  {/* Database-specific fields */}
                   <div className="grid grid-cols-2 gap-4">
                     {config.fields.map(renderField)}
                   </div>
 
-                  {/* Documentation Link */}
                   {config.documentationUrl && (
                     <div className="mt-6 p-4 bg-gray-750 rounded-md">
                       <p className="text-sm text-gray-300">
@@ -455,7 +468,6 @@ export default function DatabaseConnectionModal({
               )}
             </div>
 
-            {/* Footer */}
             <div className="p-6 border-t border-gray-700 flex justify-end space-x-3">
               <button
                 onClick={onClose}

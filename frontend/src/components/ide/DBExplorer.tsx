@@ -30,6 +30,7 @@ export default function DBExplorer({ onTableSelect, onQueryGenerate, currentConn
   const [loading, setLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
+  const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (currentConnection?.isActive) {
@@ -49,15 +50,11 @@ export default function DBExplorer({ onTableSelect, onQueryGenerate, currentConn
     setLoading(true);
     try {
       const data = await databaseAPI.getSchema(currentConnection.id);
-      console.log('📥 스키마 데이터 수신:', data);
       
-      // 백엔드에서 직접 스키마 객체를 반환함 (data.schema가 아님)
       if (data && data.tables) {
         setSchema(data);
         setConnectionStatus('connected');
-        console.log('✅ 스키마 설정 완료, 테이블 수:', data.tables.length);
       } else {
-        console.warn('⚠️ 스키마 데이터가 올바르지 않음:', data);
         setConnectionStatus('disconnected');
       }
     } catch (error) {
@@ -72,259 +69,256 @@ export default function DBExplorer({ onTableSelect, onQueryGenerate, currentConn
     const newExpanded = new Set(expandedTables);
     if (newExpanded.has(tableName)) {
       newExpanded.delete(tableName);
+      // 테이블 닫을 때 컬럼도 닫기
+      setExpandedColumns(prev => new Set([...prev].filter(col => !col.startsWith(tableName))));
     } else {
       newExpanded.add(tableName);
     }
     setExpandedTables(newExpanded);
   };
 
-  const handleTableClick = (tableName: string) => {
-    onTableSelect?.(tableName);
-    const query = `SELECT * FROM ${tableName} LIMIT 10;`;
-    onQueryGenerate?.(query);
+  const toggleColumns = (tableName: string) => {
+    const columnsKey = `${tableName}_columns`;
+    const newExpanded = new Set(expandedColumns);
+    if (newExpanded.has(columnsKey)) {
+      newExpanded.delete(columnsKey);
+    } else {
+      newExpanded.add(columnsKey);
+    }
+    setExpandedColumns(newExpanded);
   };
 
-  const generateInsertQuery = (tableName: string, columns: any[]) => {
-    const columnNames = columns.map(col => col.name).join(', ');
-    const placeholders = columns.map(() => '?').join(', ');
-    const query = `INSERT INTO ${tableName} (${columnNames}) VALUES (${placeholders});`;
-    onQueryGenerate?.(query);
-  };
-
-  const generateUpdateQuery = (tableName: string, columns: any[]) => {
-    const setClause = columns.filter(col => !col.primary_key).map(col => `${col.name} = ?`).join(', ');
-    const primaryKey = columns.find(col => col.primary_key);
-    const whereClause = primaryKey ? `${primaryKey.name} = ?` : 'id = ?';
-    const query = `UPDATE ${tableName} SET ${setClause} WHERE ${whereClause};`;
+  const handleTableClick = (tableName: string, schemaName?: string) => {
+    const fullTableName = schemaName && schemaName !== 'default' ? `${schemaName}.${tableName}` : tableName;
+    onTableSelect?.(fullTableName);
+    const query = `SELECT * FROM ${fullTableName} LIMIT 10;`;
     onQueryGenerate?.(query);
   };
 
   const getColumnIcon = (column: any) => {
     if (column.primary_key) return '🔑';
-    if (column.type.toLowerCase().includes('int')) return '🔢';
-    if (column.type.toLowerCase().includes('varchar') || column.type.toLowerCase().includes('text')) return '📝';
+    if (column.type.toLowerCase().includes('int')) return '#';
+    if (column.type.toLowerCase().includes('varchar') || column.type.toLowerCase().includes('text')) return 'Aa';
     if (column.type.toLowerCase().includes('date') || column.type.toLowerCase().includes('time')) return '📅';
-    if (column.type.toLowerCase().includes('bool')) return '☑️';
-    return '📄';
+    if (column.type.toLowerCase().includes('bool')) return '☑';
+    return '○';
   };
 
   const getConnectionIcon = () => {
     switch (connectionStatus) {
-      case 'connected': return <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>;
-      case 'disconnected': return <div className="w-2 h-2 bg-red-400 rounded-full"></div>;
-      case 'loading': return <div className="w-2 h-2 bg-yellow-400 rounded-full animate-spin"></div>;
+      case 'connected': return <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>;
+      case 'disconnected': return <div className="w-1.5 h-1.5 bg-red-400 rounded-full"></div>;
+      case 'loading': return <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse"></div>;
     }
   };
-
-  const getConnectionDisplayInfo = () => {
-    if (!currentConnection) {
-      return {
-        title: '연결 없음',
-        subtitle: '데이터베이스에 연결하세요'
-      };
-    }
-    
-    return {
-      title: currentConnection.name,
-      subtitle: `${currentConnection.type.toUpperCase()} • ${currentConnection.host || 'localhost'}`
-    };
-  };
-
-  const connectionInfo = getConnectionDisplayInfo();
 
   return (
-    <div className="h-full flex flex-col bg-gray-800">
-      {/* Header */}
-      <div className="p-3 border-b border-gray-700">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white flex items-center">
-            <span className="mr-2">📂</span>
-            DB Explorer
-          </h3>
-          <div className="flex items-center space-x-2">
-            {getConnectionIcon()}
-            <button
-              onClick={loadSchema}
-              className="text-xs text-gray-400 hover:text-white transition-colors"
-              title="새로고침"
-              disabled={loading || !currentConnection}
-            >
-              {loading ? '⟳' : '🔄'}
-            </button>
-          </div>
+    <div className="h-full flex flex-col bg-gray-900 text-xs">
+      {/* Compact Header */}
+      <div className="px-2 py-1.5 border-b border-gray-700 flex items-center justify-between">
+        <div className="flex items-center space-x-1.5">
+          <span className="text-gray-400">📂</span>
+          <span className="text-gray-300 font-medium text-xs">EXPLORER</span>
         </div>
-        <div className="text-xs text-gray-400 mt-1">
-          <div>{connectionInfo.title}</div>
-          <div className="text-gray-500">{connectionInfo.subtitle}</div>
+        <div className="flex items-center space-x-1">
+          {getConnectionIcon()}
+          <button
+            onClick={loadSchema}
+            className="text-gray-400 hover:text-white transition-colors p-0.5 rounded hover:bg-gray-700"
+            title="새로고침"
+            disabled={loading || !currentConnection}
+          >
+            {loading ? '⟳' : '🔄'}
+          </button>
         </div>
       </div>
 
-      {/* Connection Status */}
-      {!currentConnection ? (
-        <div className="flex-1 flex items-center justify-center text-gray-400">
-          <div className="text-center">
-            <div className="text-4xl mb-4">🔌</div>
-            <h3 className="text-lg font-medium mb-2">연결 필요</h3>
-            <p className="text-sm mb-4">데이터베이스에 연결하여<br />스키마를 탐색하세요</p>
-            <div className="text-xs text-gray-500">
-              상단 메뉴 → Database → Connection Manager
-            </div>
+      {/* Tree View */}
+      <div className="flex-1 overflow-y-auto">
+        {!currentConnection ? (
+          <div className="p-4 text-center text-gray-500">
+            <div className="text-lg mb-1">🔌</div>
+            <div className="text-xs">연결이 필요합니다</div>
           </div>
-        </div>
-      ) : (
-        <>
-          {/* Connection Actions */}
-          <div className="p-2 border-b border-gray-700">
-            <div className="grid grid-cols-2 gap-1">
-              <button
-                className="p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded text-xs font-medium transition-colors"
-                onClick={loadSchema}
-                disabled={loading}
-              >
-                🔄 새로고침
-              </button>
-              
-              <button
-                className="p-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded text-xs font-medium transition-colors"
-                onClick={() => onQueryGenerate?.('SHOW TABLES;')}
-                disabled={!currentConnection?.isActive}
-              >
-                📋 테이블 목록
-              </button>
-            </div>
+        ) : loading ? (
+          <div className="p-4 text-center text-gray-500">
+            <div className="text-lg mb-1">⏳</div>
+            <div className="text-xs">로딩 중...</div>
           </div>
+        ) : !schema || schema.tables.length === 0 ? (
+          <div className="p-4 text-center text-gray-500">
+            <div className="text-lg mb-1">📂</div>
+            <div className="text-xs">테이블이 없습니다</div>
+          </div>
+        ) : (
+          <div className="p-1">
+            {/* Database Root */}
+            <div className="py-0.5 px-1 text-gray-400 text-xs font-medium flex items-center">
+              <span className="mr-1">🗄️</span>
+              <span className="truncate">{currentConnection.name}</span>
+              <span className="ml-1 text-gray-600">({schema.tables.length})</span>
+            </div>
+            
+            {/* Tables Tree - 스키마별 그룹화 */}
+            <div className="ml-2">
+              {/* 스키마별로 그룹화 */}
+              {(() => {
+                const tablesBySchema = schema.tables.reduce((acc, table) => {
+                  const schemaName = (table as any).schema || 'default';
+                  if (!acc[schemaName]) {
+                    acc[schemaName] = [];
+                  }
+                  acc[schemaName].push(table);
+                  return acc;
+                }, {} as Record<string, typeof schema.tables>);
 
-          {/* Database Trees */}
-          <div className="flex-1 overflow-y-auto p-2">
-            {loading ? (
-              <div className="flex items-center justify-center h-32 text-gray-400">
-                <div className="text-center">
-                  <div className="text-2xl mb-2">⏳</div>
-                  <div className="text-xs">스키마 로딩 중...</div>
-                </div>
-              </div>
-            ) : connectionStatus === 'disconnected' ? (
-              <div className="flex items-center justify-center h-32 text-gray-400">
-                <div className="text-center">
-                  <div className="text-2xl mb-2">❌</div>
-                  <div className="text-xs">데이터베이스 연결 실패</div>
-                  <button
-                    onClick={loadSchema}
-                    className="mt-2 px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded"
-                  >
-                    재연결
-                  </button>
-                </div>
-              </div>
-            ) : !schema || schema.tables.length === 0 ? (
-              <div className="flex items-center justify-center h-32 text-gray-400">
-                <div className="text-center">
-                  <div className="text-2xl mb-2">📂</div>
-                  <div className="text-xs">테이블이 없습니다</div>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {schema.tables.map((table) => (
-                  <div key={table.name} className="border border-gray-700 rounded">
-                    {/* Table Header */}
-                    <div 
-                      className="flex items-center justify-between p-2 bg-gray-750 hover:bg-gray-700 cursor-pointer transition-colors"
-                      onClick={() => toggleTable(table.name)}
-                    >
-                      <div className="flex items-center space-x-2 min-w-0">
-                        <span className="text-xs">
-                          {expandedTables.has(table.name) ? '📂' : '📁'}
+                return Object.entries(tablesBySchema).map(([schemaName, tables]) => (
+                  <div key={schemaName}>
+                    {/* 스키마 노드 - 여러 스키마가 있을 때만 표시 */}
+                    {Object.keys(tablesBySchema).length > 1 && (
+                      <div 
+                        className="flex items-center py-0.5 px-1 hover:bg-gray-800 rounded cursor-pointer text-purple-400"
+                        onClick={() => {
+                          const schemaKey = `schema_${schemaName}`;
+                          const newExpanded = new Set(expandedTables);
+                          if (newExpanded.has(schemaKey)) {
+                            newExpanded.delete(schemaKey);
+                            // 스키마 닫을 때 해당 스키마의 모든 테이블도 닫기
+                            tables.forEach(table => {
+                              newExpanded.delete(table.name);
+                              setExpandedColumns(prev => new Set([...prev].filter(col => !col.startsWith(table.name))));
+                            });
+                          } else {
+                            newExpanded.add(schemaKey);
+                          }
+                          setExpandedTables(newExpanded);
+                        }}
+                      >
+                        <span className="text-gray-400 mr-1 text-xs">
+                          {expandedTables.has(`schema_${schemaName}`) ? '▼' : '▶'}
                         </span>
-                        <span className="text-sm font-medium text-white truncate">
-                          {table.name}
+                        <span className="text-purple-400 mr-1">📁</span>
+                        <span className="text-xs text-purple-300">
+                          {schemaName}
                         </span>
-                        {table.row_count !== undefined && (
-                          <span className="text-xs text-gray-400">
-                            ({table.row_count}행)
-                          </span>
-                        )}
+                        <span className="ml-1 text-gray-600 text-xs">
+                          ({tables.length})
+                        </span>
                       </div>
-                      <div className="flex space-x-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleTableClick(table.name);
-                          }}
-                          className="text-xs text-blue-400 hover:text-blue-300"
-                          title="SELECT 쿼리 생성"
-                        >
-                          👁️
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Table Details */}
-                    {expandedTables.has(table.name) && (
-                      <div className="bg-gray-800">
-                        {/* Quick Actions */}
-                        <div className="px-2 py-1 border-b border-gray-700">
-                          <div className="flex space-x-1">
-                            <button
-                              onClick={() => handleTableClick(table.name)}
-                              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded"
-                              title="SELECT 쿼리"
-                            >
-                              SELECT
-                            </button>
-                            <button
-                              onClick={() => generateInsertQuery(table.name, table.columns)}
-                              className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded"
-                              title="INSERT 쿼리"
-                            >
-                              INSERT
-                            </button>
-                            <button
-                              onClick={() => generateUpdateQuery(table.name, table.columns)}
-                              className="px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded"
-                              title="UPDATE 쿼리"
-                            >
-                              UPDATE
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Columns */}
-                        <div className="p-2 space-y-1">
-                          {table.columns.map((column, index) => (
-                            <div 
-                              key={index}
-                              className="flex items-center justify-between p-1 hover:bg-gray-700 rounded text-xs"
-                            >
-                              <div className="flex items-center space-x-2 min-w-0">
-                                <span>{getColumnIcon(column)}</span>
-                                <span className="text-white font-medium truncate">
-                                  {column.name}
+                    )}
+                    
+                    {/* 테이블 목록 - 스키마가 펼쳐져 있거나 단일 스키마일 때만 표시 */}
+                    {(Object.keys(tablesBySchema).length === 1 || expandedTables.has(`schema_${schemaName}`)) && (
+                      <div className={Object.keys(tablesBySchema).length > 1 ? "ml-3" : ""}>
+                        {tables.map((table) => (
+                          <div key={`${schemaName}.${table.name}`}>
+                            {/* Table Node */}
+                            <div className="group">
+                              <div 
+                                className="flex items-center py-0.5 px-1 hover:bg-gray-800 rounded cursor-pointer"
+                                onClick={() => toggleTable(table.name)}
+                              >
+                                <span className="text-gray-400 mr-1 text-xs">
+                                  {expandedTables.has(table.name) ? '▼' : '▶'}
                                 </span>
+                                <span className="text-blue-400 mr-1">📄</span>
+                                <span 
+                                  className="text-gray-300 text-xs truncate hover:text-white"
+                                  onDoubleClick={() => handleTableClick(table.name, (table as any).schema)}
+                                  title={`${(table as any).schema ? `${(table as any).schema}.` : ''}${table.name} (더블클릭: SELECT 쿼리)`}
+                                >
+                                  {table.name}
+                                </span>
+                                {table.row_count !== undefined && (
+                                  <span className="ml-1 text-gray-600 text-xs">
+                                    ({table.row_count > 1000 ? `${Math.round(table.row_count/1000)}k` : table.row_count})
+                                  </span>
+                                )}
                               </div>
-                              <div className="flex items-center space-x-1 text-gray-400">
-                                <span className="text-xs">{column.type}</span>
-                                {column.primary_key && <span title="Primary Key">PK</span>}
-                                {!column.nullable && <span title="Not Null">NN</span>}
-                              </div>
+                              
+                              {/* Table Content */}
+                              {expandedTables.has(table.name) && (
+                                <div className="ml-4 border-l border-gray-700 pl-2">
+                                  {/* Columns Section */}
+                                  <div>
+                                    <div 
+                                      className="flex items-center py-0.5 px-1 hover:bg-gray-800 rounded cursor-pointer"
+                                      onClick={() => toggleColumns(table.name)}
+                                    >
+                                      <span className="text-gray-400 mr-1 text-xs">
+                                        {expandedColumns.has(`${table.name}_columns`) ? '▼' : '▶'}
+                                      </span>
+                                      <span className="text-green-400 mr-1">📋</span>
+                                      <span className="text-gray-400 text-xs">columns ({table.columns.length})</span>
+                                    </div>
+                                    
+                                    {/* Column List */}
+                                    {expandedColumns.has(`${table.name}_columns`) && (
+                                      <div className="ml-4 border-l border-gray-700 pl-2">
+                                        {table.columns.map((column) => (
+                                          <div key={column.name} className="flex items-center py-0.5 px-1 text-xs">
+                                            <span className="mr-1">
+                                              {column.primary_key ? '🔑' : 
+                                               column.type.includes('int') || column.type.includes('number') || column.type.includes('decimal') || column.type.includes('float') ? '#' :
+                                               column.type.includes('varchar') || column.type.includes('text') || column.type.includes('char') ? 'Aa' :
+                                               column.type.includes('date') || column.type.includes('time') ? '📅' :
+                                               column.type.includes('bool') ? '☑' : '○'}
+                                            </span>
+                                            <span className="text-gray-300 mr-1">{column.name}</span>
+                                            <span className="text-gray-500 mr-1">{column.type}</span>
+                                            {column.primary_key && <span className="text-yellow-400 text-xs mr-1">PK</span>}
+                                            {!column.nullable && <span className="text-red-400 text-xs">NN</span>}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Quick Actions */}
+                                  <div className="flex items-center py-0.5 px-1 space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={() => handleTableClick(table.name, (table as any).schema)}
+                                      className="text-xs text-blue-400 hover:text-blue-300 px-1"
+                                      title="SELECT 쿼리"
+                                    >
+                                      SELECT
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        const columnNames = table.columns.map(col => col.name).join(', ');
+                                        const placeholders = table.columns.map(() => '?').join(', ');
+                                        const fullTableName = (table as any).schema ? `${(table as any).schema}.${table.name}` : table.name;
+                                        const query = `INSERT INTO ${fullTableName} (${columnNames}) VALUES (${placeholders});`;
+                                        onQueryGenerate?.(query);
+                                      }}
+                                      className="text-xs text-green-400 hover:text-green-300 px-1"
+                                      title="INSERT 쿼리"
+                                    >
+                                      INSERT
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
-            )}
+                ));
+              })()}
+            </div>
           </div>
-        </>
-      )}
+        )}
+      </div>
 
-      {/* Footer */}
-      <div className="p-2 border-t border-gray-700 text-xs text-gray-400">
-        <div className="flex items-center justify-between">
-          <span>{currentConnection?.type || 'No'} Database</span>
-          <span>{connectionStatus === 'connected' ? '연결됨' : '연결 안됨'}</span>
+      {/* Compact Footer */}
+      <div className="px-2 py-1 border-t border-gray-700 flex items-center justify-between text-xs text-gray-500">
+        <span>{currentConnection?.type?.toUpperCase() || 'NO'} DB</span>
+        <div className="flex items-center space-x-1">
+          {connectionStatus === 'connected' && schema && (
+            <span>{schema.tables.length} tables</span>
+          )}
         </div>
       </div>
     </div>

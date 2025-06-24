@@ -55,6 +55,14 @@ export const DATABASE_CONFIGS: Record<DatabaseType, DatabaseConnectionConfig> = 
         required: false,
         defaultValue: false,
         description: 'SSL 연결 사용 여부'
+      },
+      {
+        name: 'schema',
+        label: '기본 스키마',
+        type: 'text',
+        required: false,
+        placeholder: '스키마명 (선택)',
+        description: '기본 스키마명 (미지정시 데이터베이스명 사용)'
       }
     ]
   },

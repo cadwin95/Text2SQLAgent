@@ -9,6 +9,7 @@ import AIPanel from '@/components/ide/AIPanel';
 import ResultPanel from '@/components/ide/ResultPanel';
 import ConnectionManager from '@/components/ide/ConnectionManager';
 import { DatabaseConnection } from '@/types/database';
+import { databaseAPI } from '@/utils/database-api';
 
 /**
  * SQL IDE 메인 페이지 - 3패널 구조
@@ -56,17 +57,8 @@ export default function IDEPage() {
       setConsoleMessages(prev => [...prev, `SQL: ${query}`]);
       setConsoleMessages(prev => [...prev, `Connection: ${currentConnection.name} (${currentConnection.type})`]);
       
-      // API 호출
-      const response = await fetch('/api/database/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          question: query,
-          connectionId: currentConnection.id
-        })
-      });
-      
-      const result = await response.json();
+      // API 호출 - database-api.ts의 executeQuery 함수 사용
+      const result = await databaseAPI.executeQuery(query, currentConnection.id);
       
       if (result.success) {
         setQueryResults(result);
@@ -97,16 +89,8 @@ export default function IDEPage() {
       setConsoleMessages(prev => [...prev, `[${new Date().toLocaleTimeString()}] AI 쿼리: ${question}`]);
       setConsoleMessages(prev => [...prev, `Connection: ${currentConnection.name} (${currentConnection.type})`]);
       
-      const response = await fetch('/api/database/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          question,
-          connectionId: currentConnection.id
-        })
-      });
-      
-      const result = await response.json();
+      // AI 쿼리도 동일한 executeQuery 함수 사용 (자연어는 백엔드에서 처리)
+      const result = await databaseAPI.executeQuery(question, currentConnection.id);
       
       if (result.success) {
         setQueryResults(result);
@@ -173,7 +157,7 @@ export default function IDEPage() {
       <div className="flex-1 overflow-hidden">
         <PanelGroup direction="vertical">
           {/* Top Section: DB Explorer + Query Editor + AI Panel */}
-          <Panel defaultSize={60} minSize={30}>
+          <Panel defaultSize={50} minSize={30} maxSize={70}>
             <PanelGroup direction="horizontal">
               {/* DB Explorer Panel */}
               {showDBExplorer && (
@@ -223,7 +207,7 @@ export default function IDEPage() {
           {showResultPanel && (
             <>
               <PanelResizeHandle className="h-1 bg-gray-700 hover:bg-blue-500 transition-colors cursor-row-resize" />
-              <Panel defaultSize={40} minSize={20} maxSize={60}>
+              <Panel defaultSize={50} minSize={30} maxSize={70}>
                 <ResultPanel
                   queryResults={queryResults}
                   consoleMessages={consoleMessages}

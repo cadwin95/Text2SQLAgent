@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import QueryResultTable from '../QueryResultTable';
 
 interface ResultPanelProps {
   queryResults: any;
@@ -19,66 +20,41 @@ export default function ResultPanel({
 }: ResultPanelProps) {
   
   const renderTableView = () => {
-    if (!queryResults || !queryResults.result || !queryResults.result.data) {
+    if (!queryResults || !queryResults.success || !queryResults.data) {
       return (
         <div className="flex items-center justify-center h-full text-gray-400">
           <div className="text-center">
             <div className="text-4xl mb-4">📊</div>
             <div>쿼리를 실행하면 결과가 여기에 표시됩니다</div>
+            {queryResults && !queryResults.success && queryResults.error && (
+              <div className="mt-4 text-red-400 text-sm">
+                오류: {queryResults.error}
+              </div>
+            )}
           </div>
         </div>
       );
     }
 
-    const { data, columns } = queryResults.result;
+    // 백엔드 응답 구조에 맞게 직접 접근
+    const { data, columns } = queryResults;
+    
+    // 데이터가 이미 딕셔너리 배열 형태로 오므로 그대로 사용
+    const tableData = {
+      columns: columns,
+      rows: data, // 이미 올바른 형식
+      total_rows: queryResults.row_count || data.length,
+      query_code: queryResults.query || 'SELECT * FROM table'
+    };
 
     return (
-      <div className="h-full overflow-auto">
-        <div className="p-4">
-          <div className="mb-4 text-sm text-gray-400">
-            총 {data.length}행 조회됨 • 실행 시간: {queryResults.execution_time}ms
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full bg-gray-800 rounded-lg overflow-hidden">
-              <thead className="bg-gray-700">
-                <tr>
-                  {columns.map((column: string, index: number) => (
-                    <th 
-                      key={index}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
-                    >
-                      {column}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-700">
-                {data.map((row: any[], rowIndex: number) => (
-                  <tr 
-                    key={rowIndex}
-                    className="hover:bg-gray-750 transition-colors"
-                  >
-                    {row.map((cell: any, cellIndex: number) => (
-                      <td 
-                        key={cellIndex}
-                        className="px-4 py-3 text-sm text-gray-300"
-                      >
-                        {cell === null ? (
-                          <span className="text-gray-500 italic">NULL</span>
-                        ) : typeof cell === 'object' ? (
-                          JSON.stringify(cell)
-                        ) : (
-                          String(cell)
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      <div className="h-full">
+        <QueryResultTable 
+          data={tableData}
+          title="쿼리 결과"
+          showQuery={true}
+          className="bg-gray-800 text-white border-gray-700"
+        />
       </div>
     );
   };
