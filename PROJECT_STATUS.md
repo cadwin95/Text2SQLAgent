@@ -153,6 +153,7 @@ KOSIS_OPEN_API_KEY=your_kosis_api_key
 
 ### **쿼리 실행**
 - `POST /api/database/query` - 쿼리 실행
+- `POST /api/agent/query` - 자연어 쿼리 실행
 - `GET /api/database/schema` - 스키마 조회
 - `GET /api/database/schema/tables` - 테이블 목록
 
@@ -177,6 +178,9 @@ KOSIS_OPEN_API_KEY=your_kosis_api_key
 3. **아키텍처 단순화**
    - 통일된 인터페이스로 DB와 API 관리
    - 확장 가능한 핸들러 시스템
+4. **에이전트 파이프라인 도입**
+   - `/api/agent/query` 엔드포인트 추가
+   - 자연어 → SQL 변환 및 실행 지원
 
 ### 🎯 **주요 개선점**
 - **성능 향상**: MCP 오버헤드 제거

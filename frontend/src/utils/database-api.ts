@@ -142,6 +142,20 @@ export const databaseAPI = {
     }
   },
 
+  // 자연어 질문 실행
+  agentQuery: async (question: string, connectionId?: string): Promise<any> => {
+    try {
+      const response = await databaseApiClient.post('/api/agent/query', {
+        question,
+        connection_id: connectionId
+      });
+      return response.data;
+    } catch (error) {
+      console.error('에이전트 쿼리 실패:', error);
+      throw error;
+    }
+  },
+
   // 헬스 체크
   healthCheck: async (): Promise<boolean> => {
     try {

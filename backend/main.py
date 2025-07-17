@@ -11,6 +11,7 @@ import sys
 
 # 데이터베이스 API 임포트
 from .api.database_api import router as database_router
+from .api.agent_api import router as agent_router
 from .database.connection_manager import get_connection_manager
 
 
@@ -76,6 +77,7 @@ app.add_middleware(
 
 # 데이터베이스 API 라우터 등록
 app.include_router(database_router)
+app.include_router(agent_router)
 
 
 @app.get("/")

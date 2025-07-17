@@ -89,8 +89,8 @@ export default function IDEPage() {
       setConsoleMessages(prev => [...prev, `[${new Date().toLocaleTimeString()}] AI 쿼리: ${question}`]);
       setConsoleMessages(prev => [...prev, `Connection: ${currentConnection.name} (${currentConnection.type})`]);
       
-      // AI 쿼리도 동일한 executeQuery 함수 사용 (자연어는 백엔드에서 처리)
-      const result = await databaseAPI.executeQuery(question, currentConnection.id);
+      // 자연어 질문을 에이전트 엔드포인트로 전달
+      const result = await databaseAPI.agentQuery(question, currentConnection.id);
       
       if (result.success) {
         setQueryResults(result);
