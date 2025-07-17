@@ -187,6 +187,8 @@ KOSIS_OPEN_API_KEY=your_kosis_api_key
 - **유지보수성**: 통합된 코드베이스
 - **확장성**: 새로운 API 쉽게 추가 가능
 - **안정성**: 검증된 MindsDB 패턴 적용
+- **PostgreSQL 최적화**: 메타데이터 기반 행 수 조회로 테이블 로딩 속도 향상
+- **스키마 API 개선**: `includeColumns` 파라미터로 컬럼 정보 지연 로딩 가능
 
 ---
 

@@ -49,7 +49,7 @@ export default function DBExplorer({ onTableSelect, onQueryGenerate, currentConn
 
     setLoading(true);
     try {
-      const data = await databaseAPI.getSchema(currentConnection.id);
+      const data = await databaseAPI.getSchema(currentConnection.id, false);
       
       if (data && data.tables) {
         setSchema(data);
@@ -77,13 +77,36 @@ export default function DBExplorer({ onTableSelect, onQueryGenerate, currentConn
     setExpandedTables(newExpanded);
   };
 
-  const toggleColumns = (tableName: string) => {
+  const toggleColumns = async (tableName: string, schemaName?: string) => {
     const columnsKey = `${tableName}_columns`;
     const newExpanded = new Set(expandedColumns);
     if (newExpanded.has(columnsKey)) {
       newExpanded.delete(columnsKey);
     } else {
       newExpanded.add(columnsKey);
+      if (schema) {
+        const table = schema.tables.find(t => t.name === tableName && ((t as any).schema || 'default') === (schemaName || 'default'));
+        if (table && table.columns.length === 0 && currentConnection) {
+          try {
+            const data = await databaseAPI.getTableInfo(tableName, currentConnection.id, schemaName);
+            if (data && data.columns) {
+              setSchema(prev => {
+                if (!prev) return prev;
+                const updated = { ...prev };
+                updated.tables = prev.tables.map(t => {
+                  if (t.name === tableName && ((t as any).schema || 'default') === (schemaName || 'default')) {
+                    return { ...t, columns: data.columns };
+                  }
+                  return t;
+                });
+                return updated;
+              });
+            }
+          } catch (error) {
+            console.error('컬럼 정보 로딩 실패:', error);
+          }
+        }
+      }
     }
     setExpandedColumns(newExpanded);
   };
@@ -243,7 +266,7 @@ export default function DBExplorer({ onTableSelect, onQueryGenerate, currentConn
                                   <div>
                                     <div 
                                       className="flex items-center py-0.5 px-1 hover:bg-gray-800 rounded cursor-pointer"
-                                      onClick={() => toggleColumns(table.name)}
+                                      onClick={() => toggleColumns(table.name, schemaName)}
                                     >
                                       <span className="text-gray-400 mr-1 text-xs">
                                         {expandedColumns.has(`${table.name}_columns`) ? '▼' : '▶'}

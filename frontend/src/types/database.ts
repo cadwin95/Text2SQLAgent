@@ -130,7 +130,7 @@ export interface DatabaseDriver {
   connect(connection: DatabaseConnection): Promise<boolean>;
   disconnect(connectionId: string): Promise<boolean>;
   testConnection(connection: DatabaseConnection): Promise<ConnectionTestResult>;
-  getSchema(connectionId: string): Promise<DatabaseSchema>;
+  getSchema(connectionId: string, includeColumns?: boolean): Promise<DatabaseSchema>;
   executeQuery(connectionId: string, query: string): Promise<any>;
   getTableData(connectionId: string, tableName: string, limit?: number): Promise<any>;
 } 

@@ -187,7 +187,11 @@ class MySQLHandler(BaseDatabaseHandler):
                 execution_time=execution_time
             )
     
-    async def get_tables(self, schema: Optional[str] = None) -> List[TableInfo]:
+    async def get_tables(
+        self,
+        schema: Optional[str] = None,
+        include_columns: bool = True,
+    ) -> List[TableInfo]:
         """MySQL 테이블 목록 조회"""
         try:
             database = schema or self.config.database
@@ -222,7 +226,8 @@ class MySQLHandler(BaseDatabaseHandler):
                 )
                 
                 # 컬럼 정보 추가
-                table_info.columns = await self._get_table_columns(row['name'], database)
+                if include_columns:
+                    table_info.columns = await self._get_table_columns(row['name'], database)
                 tables.append(table_info)
             
             return tables
@@ -230,10 +235,10 @@ class MySQLHandler(BaseDatabaseHandler):
         except Exception as e:
             raise SchemaError(f"Failed to get MySQL tables: {e}")
     
-    async def get_schema(self) -> SchemaInfo:
+    async def get_schema(self, include_columns: bool = True) -> SchemaInfo:
         """MySQL 스키마 정보 조회"""
         try:
-            tables = await self.get_tables()
+            tables = await self.get_tables(include_columns=include_columns)
             
             # 뷰 조회
             views_query = """

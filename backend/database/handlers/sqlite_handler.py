@@ -184,7 +184,11 @@ class SQLiteHandler(BaseDatabaseHandler):
                 execution_time=execution_time
             )
     
-    async def get_tables(self, schema: Optional[str] = None) -> List[TableInfo]:
+    async def get_tables(
+        self,
+        schema: Optional[str] = None,
+        include_columns: bool = True,
+    ) -> List[TableInfo]:
         """SQLite 테이블 목록 조회"""
         try:
             query = """
@@ -223,7 +227,8 @@ class SQLiteHandler(BaseDatabaseHandler):
                 )
                 
                 # 컬럼 정보 추가
-                table_info.columns = await self._get_table_columns(row['name'])
+                if include_columns:
+                    table_info.columns = await self._get_table_columns(row['name'])
                 tables.append(table_info)
             
             return tables
@@ -231,10 +236,10 @@ class SQLiteHandler(BaseDatabaseHandler):
         except Exception as e:
             raise SchemaError(f"Failed to get SQLite tables: {e}")
     
-    async def get_schema(self) -> SchemaInfo:
+    async def get_schema(self, include_columns: bool = True) -> SchemaInfo:
         """SQLite 스키마 정보 조회"""
         try:
-            tables = await self.get_tables()
+            tables = await self.get_tables(include_columns=include_columns)
             
             # 테이블과 뷰 분리
             table_list = [t for t in tables if t.type == 'table']
