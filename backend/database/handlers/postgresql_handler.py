@@ -234,9 +234,12 @@ class PostgreSQLHandler(BaseDatabaseHandler):
         """PostgreSQL 테이블 목록 조회"""
         try:
             schema_name = schema or 'public'
-            
+
+            # 미리 row count 메타데이터 조회
+            row_count_map = await self._get_row_count_metadata(schema_name)
+
             query = """
-            SELECT 
+            SELECT
                 t.table_name as name,
                 t.table_schema as schema_name,
                 t.table_type as type,
@@ -252,21 +255,17 @@ class PostgreSQLHandler(BaseDatabaseHandler):
             result = await self.execute_query(query, {"schema_name": schema_name})
             if not result.success:
                 raise SchemaError(f"Failed to get tables: {result.error}")
-            
+
             tables = []
             for row in result.data:
-                # 행 수 조회
+                # 메타데이터 기반 행 수. 없으면 테이블 제외
                 row_count = None
                 if row['type'] == 'BASE TABLE':
-                    try:
-                        count_result = await self.execute_query(
-                            f'SELECT COUNT(*) as count FROM "{schema_name}"."{row["name"]}"'
-                        )
-                        if count_result.success and count_result.data:
-                            row_count = count_result.data[0]['count']
-                    except:
-                        pass
-                
+                    row_count = row_count_map.get(row['name'])
+                    if row_count is None:
+                        # 메타데이터가 없는 테이블은 건너뜀
+                        continue
+
                 table_info = TableInfo(
                     name=row['name'],
                     schema=row['schema_name'],
@@ -389,18 +388,12 @@ class PostgreSQLHandler(BaseDatabaseHandler):
             
             row = result.data[0]
             
-            # 행 수 조회
+            # 메타데이터 기반 행 수 조회
             row_count = None
             if row['type'] == 'BASE TABLE':
-                try:
-                    count_result = await self.execute_query(
-                        f'SELECT COUNT(*) as count FROM "{schema_name}"."{table_name}"'
-                    )
-                    if count_result.success and count_result.data:
-                        row_count = count_result.data[0]['count']
-                except:
-                    pass
-            
+                row_counts = await self._get_row_count_metadata(schema_name)
+                row_count = row_counts.get(table_name)
+
             table_info = TableInfo(
                 name=row['name'],
                 schema=row['schema_name'],
@@ -463,6 +456,19 @@ class PostgreSQLHandler(BaseDatabaseHandler):
             columns.append(column)
         
         return columns
+
+    async def _get_row_count_metadata(self, schema: str) -> Dict[str, int]:
+        """pg_stat 메타데이터에서 테이블별 행 수 조회"""
+        query = """
+        SELECT relname as table_name, n_live_tup
+        FROM pg_stat_all_tables
+        WHERE schemaname = $1
+        """
+
+        result = await self.execute_query(query, {"schema": schema})
+        if not result.success:
+            return {}
+        return {row['table_name']: row['n_live_tup'] for row in result.data if row['n_live_tup'] is not None}
     
     async def get_version(self) -> Optional[str]:
         """PostgreSQL 버전 조회"""
