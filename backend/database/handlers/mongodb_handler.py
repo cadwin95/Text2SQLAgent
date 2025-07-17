@@ -312,7 +312,11 @@ class MongoDBHandler(BaseDatabaseHandler):
                 execution_time=execution_time
             )
     
-    async def get_tables(self, schema: Optional[str] = None) -> List[TableInfo]:
+    async def get_tables(
+        self,
+        schema: Optional[str] = None,
+        include_columns: bool = True,
+    ) -> List[TableInfo]:
         """MongoDB 컬렉션 목록 조회"""
         try:
             collections = await self._database.list_collection_names()
@@ -332,7 +336,7 @@ class MongoDBHandler(BaseDatabaseHandler):
                     size = None
                 
                 # 컬럼 정보 (스키마 추론)
-                columns = await self._infer_schema(collection)
+                columns = await self._infer_schema(collection) if include_columns else []
                 
                 table_info = TableInfo(
                     name=collection_name,
@@ -349,10 +353,10 @@ class MongoDBHandler(BaseDatabaseHandler):
         except Exception as e:
             raise SchemaError(f"Failed to get MongoDB collections: {e}")
     
-    async def get_schema(self) -> SchemaInfo:
+    async def get_schema(self, include_columns: bool = True) -> SchemaInfo:
         """MongoDB 스키마 정보 조회"""
         try:
-            tables = await self.get_tables()
+            tables = await self.get_tables(include_columns=include_columns)
             
             return SchemaInfo(
                 name=self.config.database,

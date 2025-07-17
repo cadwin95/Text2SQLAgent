@@ -216,7 +216,11 @@ class BaseAPIHandler(BaseDatabaseHandler):
                 execution_time=execution_time
             )
     
-    async def get_tables(self, schema: Optional[str] = None) -> List[TableInfo]:
+    async def get_tables(
+        self,
+        schema: Optional[str] = None,
+        include_columns: bool = True,
+    ) -> List[TableInfo]:
         """API 테이블 목록 조회 (엔드포인트 목록)"""
         try:
             tables = []
@@ -226,7 +230,7 @@ class BaseAPIHandler(BaseDatabaseHandler):
                     schema=self.api_name,
                     type="api_endpoint",
                     comment=table_def.endpoint.description,
-                    columns=table_def.columns
+                    columns=table_def.columns if include_columns else []
                 )
                 tables.append(table_info)
             
@@ -235,10 +239,10 @@ class BaseAPIHandler(BaseDatabaseHandler):
         except Exception as e:
             raise SchemaError(f"Failed to get {self.api_name} API tables: {e}")
     
-    async def get_schema(self) -> SchemaInfo:
+    async def get_schema(self, include_columns: bool = True) -> SchemaInfo:
         """API 스키마 정보 조회"""
         try:
-            tables = await self.get_tables()
+            tables = await self.get_tables(include_columns=include_columns)
             
             return SchemaInfo(
                 name=self.api_name,

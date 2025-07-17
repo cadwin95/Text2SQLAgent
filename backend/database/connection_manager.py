@@ -239,7 +239,12 @@ class ConnectionManager:
                 error=f"Query execution failed: {e}"
             )
     
-    async def get_tables(self, connection_id: Optional[str] = None, schema: Optional[str] = None) -> List[TableInfo]:
+    async def get_tables(
+        self,
+        connection_id: Optional[str] = None,
+        schema: Optional[str] = None,
+        include_columns: bool = True,
+    ) -> List[TableInfo]:
         """테이블 목록 조회"""
         await self._ensure_initialized()
         if connection_id:
@@ -250,9 +255,13 @@ class ConnectionManager:
         if not handler:
             raise ConnectionError("No connection available")
         
-        return await handler.get_tables(schema)
+        return await handler.get_tables(schema, include_columns)
     
-    async def get_schema(self, connection_id: Optional[str] = None) -> SchemaInfo:
+    async def get_schema(
+        self,
+        connection_id: Optional[str] = None,
+        include_columns: bool = True,
+    ) -> SchemaInfo:
         """스키마 정보 조회"""
         await self._ensure_initialized()
         if connection_id:
@@ -263,7 +272,7 @@ class ConnectionManager:
         if not handler:
             raise ConnectionError("No connection available")
         
-        return await handler.get_schema()
+        return await handler.get_schema(include_columns)
     
     async def get_table_info(self, table_name: str, connection_id: Optional[str] = None, schema: Optional[str] = None) -> TableInfo:
         """특정 테이블 정보 조회"""

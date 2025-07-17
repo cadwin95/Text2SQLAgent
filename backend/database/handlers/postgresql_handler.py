@@ -230,7 +230,11 @@ class PostgreSQLHandler(BaseDatabaseHandler):
                 execution_time=execution_time
             )
     
-    async def get_tables(self, schema: Optional[str] = None) -> List[TableInfo]:
+    async def get_tables(
+        self,
+        schema: Optional[str] = None,
+        include_columns: bool = True,
+    ) -> List[TableInfo]:
         """PostgreSQL 테이블 목록 조회"""
         try:
             schema_name = schema or 'public'
@@ -276,7 +280,8 @@ class PostgreSQLHandler(BaseDatabaseHandler):
                 )
                 
                 # 컬럼 정보 추가
-                table_info.columns = await self._get_table_columns(row['name'], schema_name)
+                if include_columns:
+                    table_info.columns = await self._get_table_columns(row['name'], schema_name)
                 tables.append(table_info)
             
             return tables
@@ -301,7 +306,7 @@ class PostgreSQLHandler(BaseDatabaseHandler):
             logger.warning(f"Failed to get schemas: {e}")
             return []
 
-    async def get_schema(self) -> SchemaInfo:
+    async def get_schema(self, include_columns: bool = True) -> SchemaInfo:
         """PostgreSQL 스키마 정보 조회 - 모든 스키마 또는 지정 스키마"""
         try:
             # 모든 스키마 조회
@@ -316,7 +321,7 @@ class PostgreSQLHandler(BaseDatabaseHandler):
             for schema_name in all_schemas:
                 try:
                     # 테이블 조회
-                    tables = await self.get_tables(schema_name)
+                    tables = await self.get_tables(schema_name, include_columns)
                     all_tables.extend([t for t in tables if t.type == 'base_table'])
                     
                     # 뷰 조회

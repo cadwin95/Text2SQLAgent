@@ -378,11 +378,12 @@ async def execute_database_query(
 async def get_database_tables(
     connection_id: Optional[str] = None,
     schema: Optional[str] = None,
+    includeColumns: bool = False,
     manager: ConnectionManager = Depends(get_db_manager)
 ):
     """데이터베이스 테이블 목록 조회"""
     try:
-        tables = await manager.get_tables(connection_id, schema)
+        tables = await manager.get_tables(connection_id, schema, include_columns=includeColumns)
         return [
             TableResponse(
                 name=table.name,
@@ -405,6 +406,7 @@ async def get_database_tables(
 @router.get("/schema", response_model=SchemaResponse)
 async def get_database_schema(
     connection_id: Optional[str] = None,
+    includeColumns: bool = False,
     manager: ConnectionManager = Depends(get_db_manager)
 ):
     """데이터베이스 스키마 정보 조회"""
@@ -438,7 +440,7 @@ async def get_database_schema(
                         detail=f"No active connection. Please activate one of {len(all_connections)} available connections."
                     )
         
-        schema = await manager.get_schema(connection_id)
+        schema = await manager.get_schema(connection_id, include_columns=includeColumns)
         
         return SchemaResponse(
             name=schema.name,

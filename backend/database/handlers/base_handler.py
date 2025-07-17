@@ -154,13 +154,27 @@ class BaseDatabaseHandler(ABC):
         pass
     
     @abstractmethod
-    async def get_tables(self, schema: Optional[str] = None) -> List[TableInfo]:
-        """테이블 목록 조회"""
+    async def get_tables(self, schema: Optional[str] = None, include_columns: bool = True) -> List[TableInfo]:
+        """테이블 목록 조회
+
+        Parameters
+        ----------
+        schema : Optional[str]
+            조회할 스키마
+        include_columns : bool, default True
+            컬럼 정보까지 로드할지 여부
+        """
         pass
     
     @abstractmethod
-    async def get_schema(self) -> SchemaInfo:
-        """스키마 정보 조회"""
+    async def get_schema(self, include_columns: bool = True) -> SchemaInfo:
+        """스키마 정보 조회
+
+        Parameters
+        ----------
+        include_columns : bool, default True
+            테이블 컬럼 정보까지 함께 로드할지 여부
+        """
         pass
     
     @abstractmethod

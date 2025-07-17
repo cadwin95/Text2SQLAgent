@@ -115,11 +115,12 @@ export const databaseAPI = {
   },
 
   // 스키마 조회
-  getSchema: async (connectionId?: string): Promise<any> => {
+  getSchema: async (connectionId?: string, includeColumns?: boolean): Promise<any> => {
     try {
-      const url = connectionId 
-        ? `/api/database/schema?connectionId=${connectionId}`
-        : '/api/database/schema';
+      const params = new URLSearchParams();
+      if (connectionId) params.append('connectionId', connectionId);
+      if (includeColumns) params.append('includeColumns', 'true');
+      const url = `/api/database/schema${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await databaseApiClient.get(url);
       return response.data;
     } catch (error) {
@@ -152,6 +153,27 @@ export const databaseAPI = {
       return response.data;
     } catch (error) {
       console.error('에이전트 쿼리 실패:', error);
+      throw error;
+    }
+  },
+
+  // 특정 테이블 정보 조회 (컬럼 로딩용)
+  getTableInfo: async (
+    tableName: string,
+    connectionId?: string,
+    schema?: string
+  ): Promise<any> => {
+    try {
+      const params = new URLSearchParams();
+      if (connectionId) params.append('connectionId', connectionId);
+      if (schema) params.append('schema', schema);
+      const url = `/api/database/schema/tables/${tableName}${
+        params.toString() ? `?${params.toString()}` : ''
+      }`;
+      const response = await databaseApiClient.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('테이블 정보 조회 실패:', error);
       throw error;
     }
   },
